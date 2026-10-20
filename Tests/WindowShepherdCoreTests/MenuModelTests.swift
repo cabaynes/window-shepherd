@@ -46,9 +46,9 @@ final class MenuModelTests: XCTestCase {
         XCTAssertEqual(a1, .apply(Selection(pid: 10), .unit(UnitRect(x: 0, y: 0, w: 1, h: 1), .own), label: "Full screen"))
         XCTAssertEqual(Array(titles(menu).prefix(15)), ["Full screen", "90%", "60%", "Center (keep size)", "-",
             "Left half", "Right half", "Top half", "Bottom half", "-", "Top left", "Top right", "Bottom left", "Bottom right", "-"])
-        XCTAssertNil(submenu(menu, "Top left")!.children.compactMap { n -> String? in
-            if case let .item(t, k, _, _) = n, t.hasPrefix("All"), k != nil { return t } else { return nil } }.first,
-                     "no whole-app corner key")
+        guard case let .item(allTitle, allKeys, _, _) = submenu(menu, "Top left")!.children[1] else { return XCTFail() }
+        XCTAssertEqual(allTitle, "All Safari windows (3)")
+        XCTAssertNil(allKeys, "no whole-app corner key")
     }
 
     func testBottomOfMenu() {
