@@ -20,3 +20,10 @@ sparkle_private_key*
 .playwright-mcp/
 .taste-skill/
 # --- end workspace baseline ---
+
+# Swift / Xcode
+.build/
+.swiftpm/
+App/*.xcodeproj/
+Config/Local.xcconfig
+.superpowers/
