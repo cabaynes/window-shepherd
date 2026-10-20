@@ -8,6 +8,7 @@ final class Hotkey {
     fileprivate let id: UInt32
     private let code: UInt32
     private var ref: EventHotKeyRef?
+    private var loggedFailure = false
 
     fileprivate init(combo: Combo, id: UInt32, code: UInt32) {
         self.combo = combo
@@ -23,7 +24,8 @@ final class Hotkey {
         let status = RegisterEventHotKey(code, carbonModifiers(combo.mods), hid, GetApplicationEventTarget(), 0, &ref)
         if status != noErr {
             ref = nil
-            Log.info("couldn't bind \(combo.formatted) (error \(status))")
+            if !loggedFailure { Log.info("couldn't bind \(combo.formatted) (error \(status))") }   // once, not on every resume
+            loggedFailure = true
         }
     }
 

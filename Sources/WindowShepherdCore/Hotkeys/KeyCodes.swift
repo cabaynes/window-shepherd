@@ -45,33 +45,35 @@ public enum KeyCodes {
         var codes: [UInt16: String] = [:]
         for (n, c) in fixed { codes[UInt16(c)] = n }
         let fixedCodes = Set(fixed.values)
-        for code in UInt16(0)..<128 where !fixedCodes.contains(UInt32(code)) {
-            guard let ch = character(for: code), !ch.isEmpty else { continue }
-            let key = ch.lowercased()
-            if names[key] == nil { names[key] = UInt32(code) }
-            codes[code] = key
+        // The layout is fetched once per reload, not once per key.
+        if let source = TISCopyCurrentKeyboardLayoutInputSource()?.takeRetainedValue()
+                ?? TISCopyCurrentASCIICapableKeyboardLayoutInputSource()?.takeRetainedValue(),
+           let ptr = TISGetInputSourceProperty(source, kTISPropertyUnicodeKeyLayoutData) {
+            let data = Unmanaged<CFData>.fromOpaque(ptr).takeUnretainedValue() as Data
+            data.withUnsafeBytes { raw in
+                guard let layout = raw.baseAddress?.assumingMemoryBound(to: UCKeyboardLayout.self) else { return }
+                for code in UInt16(0)..<128 where !fixedCodes.contains(UInt32(code)) {
+                    guard let ch = character(for: code, layout: layout), !ch.isEmpty else { continue }
+                    let key = ch.lowercased()
+                    if names[key] == nil { names[key] = UInt32(code) }
+                    codes[code] = key
+                }
+            }
         }
         byName = names
         byCode = codes
     }
 
-    /// The character a key types with no modifiers on the current layout.
-    private static func character(for code: UInt16) -> String? {
-        guard let source = TISCopyCurrentKeyboardLayoutInputSource()?.takeRetainedValue()
-                ?? TISCopyCurrentASCIICapableKeyboardLayoutInputSource()?.takeRetainedValue(),
-              let ptr = TISGetInputSourceProperty(source, kTISPropertyUnicodeKeyLayoutData) else { return nil }
-        let data = Unmanaged<CFData>.fromOpaque(ptr).takeUnretainedValue() as Data
-        return data.withUnsafeBytes { raw -> String? in
-            guard let layout = raw.baseAddress?.assumingMemoryBound(to: UCKeyboardLayout.self) else { return nil }
-            var dead: UInt32 = 0
-            var chars = [UniChar](repeating: 0, count: 4)
-            var len = 0
-            let status = UCKeyTranslate(layout, code, UInt16(kUCKeyActionDisplay), 0, UInt32(LMGetKbdType()),
-                                        OptionBits(kUCKeyTranslateNoDeadKeysBit), &dead, chars.count, &len, &chars)
-            guard status == noErr, len > 0 else { return nil }
-            let s = String(utf16CodeUnits: chars, count: len)
-            return s.unicodeScalars.allSatisfy({ $0.properties.generalCategory != .control }) ? s : nil
-        }
+    /// The character a key types with no modifiers on `layout`.
+    private static func character(for code: UInt16, layout: UnsafePointer<UCKeyboardLayout>) -> String? {
+        var dead: UInt32 = 0
+        var chars = [UniChar](repeating: 0, count: 4)
+        var len = 0
+        let status = UCKeyTranslate(layout, code, UInt16(kUCKeyActionDisplay), 0, UInt32(LMGetKbdType()),
+                                    OptionBits(kUCKeyTranslateNoDeadKeysBit), &dead, chars.count, &len, &chars)
+        guard status == noErr, len > 0 else { return nil }
+        let s = String(utf16CodeUnits: chars, count: len)
+        return s.unicodeScalars.allSatisfy({ $0.properties.generalCategory != .control }) ? s : nil
     }
 }
 

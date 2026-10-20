@@ -1,4 +1,5 @@
 import CoreGraphics
+import Foundation
 
 /// The ⧉ menu as data, built only from the fast window list, so opening it
 /// is instant. The app renders it; tests read it.
@@ -15,7 +16,9 @@ public enum MenuAction: Equatable {
     case apply(Selection, Placer, label: String)
     /// Re-checked at click time: the menu may have been open across an unplug.
     case moveTo(uuid: String, name: String, Placer, Selection, label: String)
-    case retry, customize, noop, launchAtLogin, about, checkForUpdates, quit, grantAccess
+    /// Retries the offer the menu showed (by its time), not whatever replaced it since.
+    case retry(at: Date?)
+    case customize, noop, launchAtLogin, about, checkForUpdates, quit, grantAccess
 }
 
 public struct MenuInputs {
@@ -26,11 +29,12 @@ public struct MenuInputs {
     public var retry: (count: Int, titles: [String])?
     public var launchAtLogin: Bool
     public var needsAccess = false
+    public var retryAt: Date?
 
     public init(ctx: MenuContext, screens: [ScreenInfo], bindings: [ShortcutBinding], config: ShortcutConfig,
-                retry: (count: Int, titles: [String])?, launchAtLogin: Bool, needsAccess: Bool = false) {
+                retry: (count: Int, titles: [String])?, launchAtLogin: Bool, needsAccess: Bool = false, retryAt: Date? = nil) {
         self.ctx = ctx; self.screens = screens; self.bindings = bindings; self.config = config
-        self.retry = retry; self.launchAtLogin = launchAtLogin; self.needsAccess = needsAccess
+        self.retry = retry; self.launchAtLogin = launchAtLogin; self.needsAccess = needsAccess; self.retryAt = retryAt
     }
 }
 
@@ -59,13 +63,13 @@ public enum MenuModel {
             menu += [.item(title: "Grant Accessibility permission…", keys: nil, action: .grantAccess), .separator]
         }
         if let r = i.retry {
-            menu.append(.item(title: "Retry \(r.count) window\(r.count == 1 ? "" : "s") that didn't move", keys: nil, action: .retry))
+            menu.append(.item(title: "Retry \(r.count) window\(r.count == 1 ? "" : "s") that didn't move", keys: nil, action: .retry(at: i.retryAt)))
             for (n, t) in r.titles.enumerated() {
                 if n == 8 {
-                    menu.append(.item(title: "and \(r.titles.count - 8) more", keys: nil, action: .retry, indent: 1))
+                    menu.append(.item(title: "and \(r.titles.count - 8) more", keys: nil, action: .retry(at: i.retryAt), indent: 1))
                     break
                 }
-                menu.append(.item(title: t, keys: nil, action: .retry, indent: 1))
+                menu.append(.item(title: t, keys: nil, action: .retry(at: i.retryAt), indent: 1))
             }
             menu.append(.separator)
         }

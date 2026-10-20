@@ -285,8 +285,10 @@ public final class Shepherd {
         return (titles.count, titles.sorted())
     }
 
-    public func runRetry() {
-        guard let offer = retryOffer else { return }
+    /// Run the retry offer the menu showed (`offerAt` = its time); a stale
+    /// row does nothing. nil = whatever offer is current.
+    public func runRetry(offerAt: Date? = nil) {
+        guard let offer = retryOffer, offerAt == nil || offer.at == offerAt else { return }
         retryOffer = nil
         offer.run(offer.missed)
     }

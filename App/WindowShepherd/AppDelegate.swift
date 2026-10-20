@@ -151,7 +151,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             case let .refused(msg)?: HUD.show(msg)
             case nil: break
             }
-        case .retry: shepherd.runRetry()
+        case .retry(let at): shepherd.runRetry(offerAt: at)
         case .customize:
             if settings == nil { settings = SettingsWindowController(target: binder) }
             settings?.show()
