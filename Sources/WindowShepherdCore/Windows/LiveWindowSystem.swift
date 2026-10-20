@@ -11,7 +11,10 @@ public let axTimeout: Float = 0.5
 
 final class AXWindow: WindowHandle {
     let element: AXUIElement
-    init(_ e: AXUIElement) { element = e }
+    init(_ e: AXUIElement) {
+        element = e
+        AXUIElementSetMessagingTimeout(e, axTimeout)   // a timeout applies only to the element it's set on
+    }
 
     var windowID: UInt32? {
         var id = CGWindowID(0)
@@ -60,9 +63,13 @@ final class AXWindow: WindowHandle {
 }
 
 /// The real thing: CoreGraphics for the fast inventory, Accessibility for
-/// moving, each app element with a 0.5 s messaging timeout.
+/// moving. Invariant: every element we talk to has the 0.5 s messaging
+/// timeout — the system-wide element (the default for all) and, as a second
+/// guard, each app and window element we create.
 public final class LiveWindowSystem: WindowSystem {
-    public init() {}
+    public init() {
+        AXUIElementSetMessagingTimeout(AXUIElementCreateSystemWide(), axTimeout)
+    }
 
     public func visibleWindows() -> [CGWindow] { CGWindow.current() }
     public func screens() -> [ScreenInfo] { Screens.live() }

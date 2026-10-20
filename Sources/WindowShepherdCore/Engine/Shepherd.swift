@@ -41,8 +41,6 @@ public final class Shepherd {
     let runner = JobRunner()
     /// Bulk jobs and restores.
     let jobWorker = AXWorker(label: "jobs")
-    /// Single-window keyboard and menu moves, so they never queue behind a restore.
-    let snapWorker = AXWorker(label: "snap")
 
     public var onAlert: ((String) -> Void)?
     public var onBusyChanged: ((Bool) -> Void)?
@@ -51,7 +49,11 @@ public final class Shepherd {
 
     /// Restore passes scheduled but not yet run (they keep the icon red).
     var pendingPasses = 0
-    var restoreTimers: [Task<Void, Never>] = []
+    var restoreTimers: [Int: Task<Void, Never>] = [:]
+    var nextTimerID = 0
+    /// Apps with a keyboard/menu snap in flight, and the latest press waiting behind it.
+    var snapInFlight = Set<pid_t>()
+    var snapPending: [pid_t: @MainActor () async -> Void] = [:]
 
     /// True while Accessibility is missing: the tick does nothing.
     public var paused = false
@@ -109,6 +111,10 @@ public final class Shepherd {
                 alert(reportText("Moved \(total) window\(total == 1 ? "" : "s") → \(label)",
                                  skipped: tally.skipped, hasMissed: !tally.missed.isEmpty, problem: problem))
             }
+            if let pid = sel.pid, sel.winId == nil, problem != .interrupted {   // whole app: bring it forward
+                let system = self.system
+                Task { await AXWorker.detached { system.activate(pid: pid) } }
+            }
             guard book.lastSetup == startSetup else { return }
             recordNow(tally.ids)
             if !tally.missed.isEmpty || sel.retry {
@@ -116,32 +122,34 @@ public final class Shepherd {
                     self?.apply(Selection(byPid: missed, retry: true), placer: placer, label: label)
                 }
             }
-            if let pid = sel.pid, sel.winId == nil, problem != .interrupted {
-                let system = self.system
-                Task { await self.snapWorker.run { system.activate(pid: pid) } }
-            }
         }
 
         if let winId = sel.winId, let pid = sel.pid {
-            // One window: a single quick step on its own worker, outside the
-            // job runner, so a keyboard snap never interrupts an auto-restore.
+            // One window: a single quick step outside the job runner, so a
+            // keyboard snap never interrupts an auto-restore. Snaps for
+            // different apps run side by side, so a hung app delays only its
+            // own; repeated presses at one app collapse to the latest.
             // Not in the app's window list (the front "window" was a sheet)?
             // Use the app's focused window.
             let cgFrame = system.visibleWindows().first { $0.id == winId }?.frame
             let system = self.system
-            Task {
-                let moved: UInt32? = await snapWorker.run {
+            runSnap(pid) { [weak self] in
+                let moved: UInt32?? = await AXWorker.detached {
                     let wins = (try? system.appWindows(pid: pid)) ?? []
                     guard let target = wins.first(where: { $0.windowID == winId }) ?? system.focusedWindow(pid: pid),
                           let frame = target.frame() ?? cgFrame,
                           let r = placer.frame(for: frame, screens: screens, main: main),
                           (try? target.setFrame(r)) != nil else { return nil }
-                    return target.windowID ?? winId
+                    return .some(target.windowID)
                 }
-                if let id = moved {
+                guard let self else { return }
+                if case let .some(id) = moved {
                     tally.moved = 1
-                    tally.ids.insert(String(id))
-                    book.restoredIds.insert(String(id))
+                    // The screens changed meanwhile: it belongs to the old setup.
+                    if let id, id != 0, self.book.lastSetup == startSetup {
+                        tally.ids.insert(String(id))
+                        self.book.restoredIds.insert(String(id))
+                    }
                 }
                 finish(nil)
             }
@@ -165,10 +173,25 @@ public final class Shepherd {
         runner.run(.move, steps: steps, deadline: deadlineFor(windowCount: count), done: finish)
     }
 
+    /// At most one snap per app in flight; a newer press replaces any waiting one.
+    func runSnap(_ pid: pid_t, _ work: @escaping @MainActor () async -> Void) {
+        if snapInFlight.contains(pid) {
+            snapPending[pid] = work
+            return
+        }
+        snapInFlight.insert(pid)
+        Task { @MainActor in
+            await work()
+            self.snapInFlight.remove(pid)
+            if let next = self.snapPending.removeValue(forKey: pid) { self.runSnap(pid, next) }
+        }
+    }
+
     /// Save where just-moved windows are now (skips the two-sightings rule).
     func recordNow(_ ids: Set<String>) {
-        guard !ids.isEmpty, let key = book.lastSetup else { return }
-        book.recordNow(ids: ids, key: key, windows: system.visibleWindows(), screens: system.screens(), now: nowSeconds)
+        guard !ids.isEmpty else { return }
+        let screens = system.screens()
+        book.recordNow(ids: ids, key: Screens.setupKey(screens), windows: system.visibleWindows(), screens: screens, now: nowSeconds)
         store.save(book.layouts)
     }
 

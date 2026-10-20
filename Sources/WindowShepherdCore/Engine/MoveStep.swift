@@ -107,6 +107,7 @@ public func appStep<V>(pid: pid_t, wanted: [UInt32: V], system: WindowSystem, wo
                 if dead.on || !gate() { return nil }
                 let t1 = Date()
                 let ok = await worker.run { (try? action(win, value)) != nil }
+                guard gate() else { return nil }   // the screens changed meanwhile: it belongs to the old setup
                 if ok {
                     done.insert(id)
                     tally.moved += 1

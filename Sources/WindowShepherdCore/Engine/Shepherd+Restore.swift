@@ -60,17 +60,19 @@ extension Shepherd {
 
     func schedulePass(after delay: TimeInterval) {
         pendingPasses += 1
-        let task = Task { @MainActor [weak self] in
+        nextTimerID += 1
+        let id = nextTimerID
+        restoreTimers[id] = Task { @MainActor [weak self] in
             try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
             guard !Task.isCancelled, let self else { return }
+            self.restoreTimers[id] = nil
             self.restorePass()
         }
-        restoreTimers.append(task)
     }
 
     func cancelRestores() {
-        for t in restoreTimers { t.cancel() }
-        restoreTimers = []
+        for t in restoreTimers.values { t.cancel() }
+        restoreTimers = [:]
         pendingPasses = 0
     }
 
@@ -100,6 +102,7 @@ extension Shepherd {
         let tally = Tally<RestoreTarget>()
         let steps: [JobStep] = plan.keys.sorted().map { pid in
             appStep(pid: pid, wanted: plan[pid]!, system: system, worker: jobWorker, timing: timing, tally: tally,
+                    gate: { [weak self] in self?.book.lastSetup == key },
                     action: { win, t in
                         let placer = Placer.unit(t.unit, .fixed(uuid: t.screenUUID), fitInside: true)
                         guard let r = placer.frame(for: win.frame() ?? .zero, screens: screens, main: main) else {

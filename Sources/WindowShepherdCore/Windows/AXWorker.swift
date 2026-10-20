@@ -9,6 +9,14 @@ public final class AXWorker {
         queue = DispatchQueue(label: "window-shepherd." + label, qos: .userInitiated)
     }
 
+    /// Runs on a shared concurrent queue: for work that must not wait behind
+    /// other apps (keyboard snaps; callers keep one in flight per app).
+    public static func detached<T>(_ body: @escaping () -> T) async -> T {
+        await withCheckedContinuation { cont in
+            DispatchQueue.global(qos: .userInitiated).async { cont.resume(returning: body()) }
+        }
+    }
+
     public func run<T>(_ body: @escaping () -> T) async -> T {
         await withCheckedContinuation { cont in
             queue.async { cont.resume(returning: body()) }
