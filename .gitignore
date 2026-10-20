@@ -28,3 +28,4 @@ App/*.xcodeproj/
 Config/Local.xcconfig
 .superpowers/
 vendor/
+dist/

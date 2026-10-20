@@ -5,4 +5,8 @@
 CODE_SIGN_IDENTITY = -
 CODE_SIGN_STYLE = Manual
 DEVELOPMENT_TEAM =
+// Sparkle's public EdDSA key (not a secret). Empty until the first release's
+// key is generated (see docs/RELEASING.md); without it, Check for Updates
+// opens the GitHub releases page instead.
+SPARKLE_PUBLIC_KEY =
 #include? "Local.xcconfig"
