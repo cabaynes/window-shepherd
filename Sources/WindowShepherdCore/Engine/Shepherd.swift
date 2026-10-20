@@ -46,8 +46,8 @@ public final class Shepherd {
 
     public var onAlert: ((String) -> Void)?
     public var onBusyChanged: ((Bool) -> Void)?
-    public private(set) var isBusy = false
-    public private(set) var retryOffer: RetryOffer?
+    public internal(set) var isBusy = false
+    public internal(set) var retryOffer: RetryOffer?
 
     /// Restore passes scheduled but not yet run (they keep the icon red).
     var pendingPasses = 0
