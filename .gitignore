@@ -1,0 +1,22 @@
+.DS_Store
+.env
+.env.local
+*.log
+build/
+dist/
+DerivedData/
+*.xcuserstate
+xcuserdata/
+.idea/
+.vscode/*.local.json
+*.p12
+*.cer
+*.mobileprovision
+sparkle_private_key*
+
+# --- workspace baseline (managed by scripts/fanout-gitignore.sh) ---
+.claude/worktrees/
+.playwright-cli/
+.playwright-mcp/
+.taste-skill/
+# --- end workspace baseline ---
