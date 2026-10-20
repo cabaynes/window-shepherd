@@ -8,6 +8,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private(set) var binder: HotkeyBinder!
     private var statusMenu: StatusMenuController!
     private var timer: Timer?
+    private var settings: SettingsWindowController?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         Log.info("Window Shepherd \(Bundle.main.shortVersion) started")
@@ -33,6 +34,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                                                object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.shepherd.screensChanged() }
         }
+        #if DEBUG
+        // Development: `open "Window Shepherd.app" --args -WSOpenSettings YES` opens Customize Shortcuts.
+        if UserDefaults.standard.bool(forKey: "WSOpenSettings") { perform(.customize) }
+        #endif
         DistributedNotificationCenter.default().addObserver(
             forName: NSNotification.Name(kTISNotifySelectedKeyboardInputSourceChanged as String), object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated {
@@ -53,7 +58,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
         case .retry: shepherd.runRetry()
         case .quit: NSApp.terminate(nil)
-        case .customize, .noop, .launchAtLogin, .about, .checkForUpdates, .grantAccess: break
+        case .customize:
+            if settings == nil { settings = SettingsWindowController(target: binder) }
+            settings?.show()
+        case .noop, .launchAtLogin, .about, .checkForUpdates, .grantAccess: break
         }
     }
 
