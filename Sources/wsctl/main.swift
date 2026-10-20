@@ -10,7 +10,7 @@ let args = Array(CommandLine.arguments.dropFirst())
 func fmt(_ r: CGRect) -> String { String(format: "%.0f %.0f %.0f %.0f", r.minX, r.minY, r.width, r.height) }
 
 func usage() -> Never {
-    print("usage: wsctl screens | windows | move <id> <x> <y> <w> <h> | scan | check <title> <n|own> <x y w h|center>")
+    print("usage: wsctl screens | windows | move <id> <x> <y> <w> <h> | scan | check <id|title> <n|own> <x y w h|center|default>")
     exit(2)
 }
 
@@ -50,18 +50,24 @@ case "scan":
     }
     RunLoop.main.run()
 case "check":
-    // check <title> <screen|own> <x> <y> <w> <h>  — is the window at that unit rect? (±3 pt)
-    // check <title> <screen|own> center            — centred on that screen?
-    guard args.count == 7 || args.count == 4 else { usage() }
-    guard let w = system.visibleWindows().first(where: { $0.title == args[1] }) else { print("FAIL \(args[1]): not on screen"); exit(1) }
+    // check <window id|title> <screen n|own> <x> <y> <w> <h>   — at that unit rect? (±3 pt)
+    // check <window id|title> <screen n|own> center|default    — centred / at screen n's default size
+    guard args.count == 7 || (args.count == 4 && ["center", "default"].contains(args[3])) else { usage() }
+    let match: (CGWindow) -> Bool = UInt32(args[1]).map { id in { $0.id == id } } ?? { $0.title == args[1] }
+    guard let w = system.visibleWindows().first(where: match) else { print("not on screen"); exit(1) }
     let screens = system.screens()
     let dests = Screens.destinations(screens)
-    let target: ScreenInfo? = args[2] == "own" ? Geometry.screen(mostOf: w.frame, in: screens) : Int(args[2]).flatMap { $0 <= dests.count ? dests[$0 - 1].screen : nil }
-    guard let s = target else { print("FAIL \(args[1]): no screen \(args[2])"); exit(1) }
+    let dest: Destination? = Int(args[2]).flatMap { $0 >= 1 && $0 <= dests.count ? dests[$0 - 1] : nil }
+    guard let s = args[2] == "own" ? Geometry.screen(mostOf: w.frame, in: screens) : dest?.screen else {
+        print("no screen \(args[2])"); exit(1)
+    }
     let want: CGRect
-    if args[3] == "center" {
-        want = Geometry.centered(w.frame.size, in: s.frame)
-    } else {
+    switch args[3] {
+    case "center": want = Geometry.centered(w.frame.size, in: s.frame)
+    case "default":
+        guard let d = dest ?? dests.first(where: { $0.screen == s }) else { print("no screen"); exit(1) }
+        want = Placer.fraction(Screens.defaultFraction(d), on: .own).frame(for: .zero, screens: [s], main: s)!
+    default:
         guard let x = Double(args[3]), let y = Double(args[4]), let ww = Double(args[5]), let hh = Double(args[6]) else { usage() }
         want = Geometry.place(UnitRect(x: x, y: y, w: ww, h: hh), in: s.frame)
     }

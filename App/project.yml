@@ -24,6 +24,9 @@ targets:
       - path: WindowShepherd
     dependencies:
       - package: WindowShepherdCore
+      - framework: ../vendor/Sparkle/Sparkle.framework
+        embed: true
+        codeSign: true
     settings:
       base:
         PRODUCT_NAME: "Window Shepherd"
@@ -34,3 +37,6 @@ targets:
         COMBINE_HIDPI_IMAGES: YES
         ENABLE_DEBUG_DYLIB: NO
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+      configs:
+        Debug:
+          CODE_SIGN_ENTITLEMENTS: WindowShepherd/WindowShepherd-Debug.entitlements

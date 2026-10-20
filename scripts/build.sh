@@ -4,6 +4,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 CONFIG="${1:-Debug}"
+scripts/fetch-sparkle.sh
 (cd App && xcodegen generate --quiet)
 LOG="build/xcodebuild-$CONFIG.log"
 mkdir -p build

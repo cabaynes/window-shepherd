@@ -81,6 +81,10 @@ final class HotkeyBinder {
         if save { store.save(cfg) }
     }
 
+    /// Re-read the saved shortcuts (after a keyboard layout switch, a key the
+    /// old layout lacked may exist now) and rebind.
+    func reload() { apply(store.load(), save: false) }
+
     func syncNumberKeys(force: Bool = false) {
         var n = active ? Screens.destinations(shepherd.system.screens()).count : 0
         if n < 2 { n = 0 }

@@ -28,6 +28,10 @@
 	<true/>
 	<key>NSHumanReadableCopyright</key>
 	<string>© 2026 Charles Baynes. Free and open source (MIT).</string>
+	<key>SUFeedURL</key>
+	<string>https://cabaynes.github.io/window-shepherd/appcast.xml</string>
+	<key>SUEnableInstallerLauncherService</key>
+	<false/>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
 </dict>

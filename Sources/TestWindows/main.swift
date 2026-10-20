@@ -21,7 +21,8 @@ for n in 1...max(1, count) {
 }
 app.activate()
 DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-    print("ready \(getpid())")
+    // Window numbers are the CoreGraphics window ids (no Screen Recording needed to match them).
+    print("ready \(getpid()) " + windows.map { String($0.windowNumber) }.joined(separator: " "))
     fflush(stdout)
 }
 app.run()
