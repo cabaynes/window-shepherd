@@ -19,7 +19,8 @@ swift build -c debug >/dev/null 2>&1 || { echo "swift build failed"; exit 1; }
 WSCTL=.build/debug/wsctl
 osascript -e 'application id "com.windowshepherd.WindowShepherd" is running' | grep -q true \
   || { echo "Window Shepherd isn't running — open it first."; exit 1; }
-osascript -e 'application id "com.knollsoft.Rectangle" is running' | grep -q true \
+# pgrep, not `application id … is running`: that fails to compile when Rectangle isn't installed
+pgrep -xq Rectangle \
   && { echo "Rectangle is running, so Window Shepherd's window keys are off. Quit Rectangle first."; exit 1; }
 
 rm -f /tmp/ws-e2e-testwindows.out   # never read a previous run's window ids
@@ -66,6 +67,9 @@ SCREENS=$($WSCTL screens | wc -l | tr -d ' ')
 if [ "$SCREENS" -ge 2 ]; then
   front; press 18 option command; check "⌥⌘1 screen 1, its default size" $W1 1 default
   front; press 19 option command; check "⌥⌘2 screen 2, its default size" $W1 2 default
+  # From the bottom of screen 2: once came out short, its bottom stuck at screen 2's bottom edge
+  front; press 125 option command; press 18 option command; check "⌥⌘1 from the bottom of screen 2" $W1 1 default
+  front; press 19 option command
   if [ "$SCREENS" -eq 2 ]; then   # with exactly two screens, "next" is always the other one
     front; press 5 option command shift; check "⌥⌘G⇧ next screen (back to 1)" $W1 1 0.05 0.05 0.9 0.9
   fi

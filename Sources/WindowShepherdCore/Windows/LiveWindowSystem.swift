@@ -27,14 +27,21 @@ final class AXWindow: WindowHandle {
         return CGRect(origin: p, size: s)
     }
 
-    /// Size, position, size again: a move to another screen can be refused a
-    /// size the first time (Rectangle and Hammerspoon do the same). Only a
-    /// failed move counts as failure; fixed-size windows refuse sizes.
+    /// See `applyFrame`. Only a failed move counts as failure; fixed-size
+    /// windows refuse sizes.
     func setFrame(_ r: CGRect) throws {
-        set(kAXSizeAttribute, r.size)
-        let err = set(kAXPositionAttribute, r.origin)
-        set(kAXSizeAttribute, r.size)
-        if err != .success { throw AXFailure(code: err.rawValue) }
+        var err = AXError.success
+        let moved = applyFrame(r,
+                       setSize: { set(kAXSizeAttribute, $0) },
+                       setPosition: { err = set(kAXPositionAttribute, $0); return err == .success },
+                       read: frame,
+                       canResize: {
+                           var settable = DarwinBoolean(false)
+                           return AXUIElementIsAttributeSettable(element, kAXSizeAttribute as CFString, &settable) == .success
+                               && settable.boolValue
+                       },
+                       pause: { Thread.sleep(forTimeInterval: $0) })
+        if !moved { throw AXFailure(code: err.rawValue) }
     }
 
     private func value<T>(_ attr: String, _ type: AXValueType) -> T? {
