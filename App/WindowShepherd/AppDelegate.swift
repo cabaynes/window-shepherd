@@ -12,8 +12,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         Log.info("Window Shepherd \(Bundle.main.shortVersion) started")
         shepherd = Shepherd(system: LiveWindowSystem(), store: LayoutStore())
-        statusMenu = StatusMenuController()
+        statusMenu = StatusMenuController(hooks: MenuHooks(
+            shepherd: shepherd,
+            binder: { [weak self] in self?.binder },
+            launchAtLogin: { false },
+            needsAccess: { false },
+            perform: { [weak self] in self?.perform($0) }))
         binder = HotkeyBinder(shepherd: shepherd, store: ShortcutStore()) { [weak self] in self?.statusMenu.popUpAtMouse() }
+        shepherd.onAlert = { HUD.show($0) }
+        shepherd.onBusyChanged = { [weak self] in self?.statusMenu.setBusy($0) }
         shepherd.start()
         binder.active = true
 
@@ -33,6 +40,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 guard let self else { return }
                 self.binder.apply(self.binder.config, save: false)
             }
+        }
+    }
+
+    private func perform(_ action: MenuAction) {
+        switch action {
+        case .apply, .moveTo:
+            switch MenuModel.resolve(action, screens: shepherd.system.screens()) {
+            case let .run(sel, placer, label)?: shepherd.apply(sel, placer: placer, label: label)
+            case let .refused(msg)?: HUD.show(msg)
+            case nil: break
+            }
+        case .retry: shepherd.runRetry()
+        case .quit: NSApp.terminate(nil)
+        case .customize, .noop, .launchAtLogin, .about, .checkForUpdates, .grantAccess: break
         }
     }
 
