@@ -11,9 +11,13 @@ public enum Log {
     private static let queue = DispatchQueue(label: "window-shepherd.log", qos: .utility)
     private static let logger = Logger(subsystem: bundleID, category: "app")
     private static let lock = NSLock()
-    private static var _fileURL: URL = FileManager.default
-        .urls(for: .libraryDirectory, in: .userDomainMask)[0]
-        .appendingPathComponent("Logs/Window Shepherd/window-shepherd.log")
+    private static var _fileURL: URL = {
+        if NSClassFromString("XCTestCase") != nil {   // unit tests: never the user's real log
+            return FileManager.default.temporaryDirectory.appendingPathComponent("window-shepherd-tests.log")
+        }
+        return FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("Logs/Window Shepherd/window-shepherd.log")
+    }()
 
     /// Settable so tests can redirect the log.
     public static var fileURL: URL {

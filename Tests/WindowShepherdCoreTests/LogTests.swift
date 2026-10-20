@@ -20,3 +20,9 @@ final class LogTests: XCTestCase {
         XCTAssertLessThan(size, 1024)
     }
 }
+
+final class LogLocationTests: XCTestCase {
+    func testTestsNeverWriteTheUsersLog() {
+        XCTAssertFalse(Log.fileURL.path.contains("Library/Logs"), "unit tests must not write the app's real log")
+    }
+}
