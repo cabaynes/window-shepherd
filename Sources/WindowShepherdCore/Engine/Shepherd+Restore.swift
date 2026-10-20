@@ -53,6 +53,12 @@ extension Shepherd {
         // half-moved positions would be recorded. Never stay unsettled for long.
         if !book.settled && nowSeconds - book.changedAt > restoreTiming.unsettledLimit { book.settled = true }
         if book.settled && runner.current == nil {
+            // A window that was on another Space during the restore just showed
+            // up where macOS left it: put it back now (and don't record that spot).
+            if book.offscreenVisible(system.visibleWindows()) {
+                restore()
+                return
+            }
             let changed = book.snapshot(key: key, windows: system.visibleWindows(), screens: screens, now: nowSeconds)
             if changed || Date().timeIntervalSince1970 - store.lastSaved > 600 { store.save(book.layouts) }
         }
@@ -103,9 +109,11 @@ extension Shepherd {
         let steps: [JobStep] = plan.keys.sorted().map { pid in
             appStep(pid: pid, wanted: plan[pid]!, system: system, worker: jobWorker, timing: timing, tally: tally,
                     gate: { [weak self] in self?.book.lastSetup == key },
+                    // You placed it while this job ran (a snap): it's yours now.
+                    skip: { [weak self] id in self?.book.restoredIds.contains(String(id)) ?? true },
                     action: { win, t in
                         let placer = Placer.unit(t.unit, .fixed(uuid: t.screenUUID), fitInside: true)
-                        guard let r = placer.frame(for: win.frame() ?? .zero, screens: screens, main: main) else {
+                        guard let r = placer.frame(for: .zero, screens: screens, main: main) else {   // a fixed-screen unit: no need to ask the app
                             throw AXFailure(code: -25200)
                         }
                         try win.setFrame(r)

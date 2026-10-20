@@ -57,7 +57,7 @@ struct SettingsView: View {
             HStack {
                 Text(flow.statusText)
                     .font(.callout)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.primary)
                 Spacer()
                 Button("Reset all") { flow.resetAll() }
             }
@@ -87,7 +87,7 @@ struct SettingsView: View {
             Text(title.uppercased())
                 .font(.system(size: 11, weight: .semibold))
                 .tracking(0.6)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(.primary)
                 .padding(.top, 18)
             VStack(alignment: .leading, spacing: 0) { content() }
                 .padding(.horizontal, 12)
@@ -111,7 +111,7 @@ struct SettingsView: View {
                 recorderBox(r)
                 Button { flow.reset(r.entry) } label: { Text("↺").font(.system(size: 15)) }
                     .buttonStyle(.plain)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.primary)
                     .help("Back to the default")
                     .opacity(r.isDefault ? 0 : 1)
                     .disabled(r.isDefault)
@@ -154,11 +154,11 @@ struct SettingsView: View {
                         HStack(spacing: 4) {
                             if c.level != nil { Text("⚠") }
                             Text(keys)
-                            Text(c.label).font(.caption).foregroundStyle(.secondary)
+                            Text(c.label).font(.caption).foregroundStyle(.primary)
                         }
                     } else {
                         HStack(spacing: 4) {
-                            Text(c.label + ":").font(.caption).foregroundStyle(.secondary)
+                            Text(c.label + ":").font(.caption).foregroundStyle(.primary)
                             Text("menu only")
                         }
                     }
@@ -180,7 +180,7 @@ struct SettingsView: View {
             message(err, level: .block)
         } else if let p = flow.pending, p.entry == entry {
             if p.waiting {
-                message("Checking your open apps… \(p.keys ?? "") will be set when that's done.", level: .warn)
+                message("Checking your open apps… \(p.keys ?? "") will be set when that's done (keep this window open).", level: .warn)
             } else {
                 VStack(alignment: .leading, spacing: 6) {
                     ForEach(p.warns, id: \.self) { Text($0) }
@@ -232,7 +232,7 @@ struct SettingsView: View {
                 }
                 Spacer(minLength: 0)
             }
-            if let note { Text(note).font(.callout).foregroundStyle(.secondary).padding(.leading, 160) }
+            if let note { Text(note).font(.callout).foregroundStyle(.primary).padding(.leading, 160) }
             if !list.isEmpty { chips(list).padding(.leading, 160) }
             messages(entry: entry, level: nil, text: nil)
         }

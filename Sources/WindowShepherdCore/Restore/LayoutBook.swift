@@ -42,6 +42,9 @@ public final class LayoutBook {
     public var restoredIds = Set<String>()
     /// Window → spot a restore failed to move it from (don't record that spot).
     public var protect: [String: Spot] = [:]
+    /// Windows a restore wanted to move but couldn't see (on another Space,
+    /// minimized): put back when they show up, never recorded where they appear.
+    public var offscreen = Set<String>()
     /// Where the previous snapshot saw each window (same setup).
     var lastSeenAt: [String: Spot] = [:]
 
@@ -72,7 +75,7 @@ public final class LayoutBook {
                 restoredIds.insert(id)
             }
             layout[id]?.seen = now
-            if Geometry.sameSpot(spot, lastSeenAt[id]) && protect[id] == nil {
+            if Geometry.sameSpot(spot, lastSeenAt[id]) && protect[id] == nil && !offscreen.contains(id) {
                 if !Geometry.sameSpot(spot, layout[id]?.spot) { changed = true }
                 layout[id] = LayoutEntry(pid: w.pid, app: w.app, scr: spot.scr, unit: spot.unit, seen: now)
             }
@@ -106,6 +109,7 @@ public final class LayoutBook {
         lastSeenAt = [:]
         restoredIds = []
         protect = [:]
+        offscreen = []
         settled = false
         changedAt = now
     }
@@ -137,12 +141,23 @@ public final class LayoutBook {
         return plan
     }
 
+    /// True when a window the restore couldn't see is on screen now.
+    public func offscreenVisible(_ windows: [CGWindow]) -> Bool {
+        !offscreen.isEmpty && windows.contains { offscreen.contains(String($0.id)) && !restoredIds.contains(String($0.id)) }
+    }
+
     /// After a pass: windows it couldn't move are still where macOS left
     /// them; don't let a snapshot record that spot as their home.
     public func restoreFinished(plan: [pid_t: [UInt32: RestoreTarget]]) {
         for targets in plan.values {
-            for t in targets.values where !restoredIds.contains(t.id) {
-                if let from = t.from { protect[t.id] = from }
+            for t in targets.values {
+                if restoredIds.contains(t.id) {
+                    offscreen.remove(t.id)
+                } else if let from = t.from {
+                    protect[t.id] = from
+                } else {
+                    offscreen.insert(t.id)   // not on screen now: catch it when it appears
+                }
             }
         }
     }

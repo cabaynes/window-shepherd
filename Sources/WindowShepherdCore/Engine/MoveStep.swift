@@ -56,12 +56,13 @@ private final class Flag { var on = false }
 /// remaining windows again at the end of the job. The Hammerspoon log showed
 /// 43 of 48 skipped apps answering seconds later: busy, not hung.
 ///
-/// `action` runs on the worker; `gate` (main) can veto a window just before
-/// it moves; `onMoved` (main) records a success.
+/// `action` runs on the worker; `gate` (main) can veto the rest of the job and
+/// `skip` (main) one window, just before it moves; `onMoved` (main) records a success.
 @MainActor
 public func appStep<V>(pid: pid_t, wanted: [UInt32: V], system: WindowSystem, worker: AXWorker, timing: MoveTiming,
                        tally: Tally<V>, try attempt: Int = 1, partly: Bool = false,
                        gate: @escaping @MainActor () -> Bool = { true },
+                       skip: @escaping @MainActor (UInt32) -> Bool = { _ in false },
                        action: @escaping (WindowHandle, V) throws -> Void,
                        onMoved: @escaping @MainActor (UInt32, V) -> Void = { _, _ in }) -> JobStep {
     return { ctx in
@@ -80,7 +81,7 @@ public func appStep<V>(pid: pid_t, wanted: [UInt32: V], system: WindowSystem, wo
                 tally.waiting[pid] = (name, rest)
                 ctx.append(waitStep(wait))
                 ctx.append(appStep(pid: pid, wanted: rest, system: system, worker: worker, timing: timing, tally: tally,
-                                   try: attempt + 1, partly: wasPartly, gate: gate, action: action, onMoved: onMoved))
+                                   try: attempt + 1, partly: wasPartly, gate: gate, skip: skip, action: action, onMoved: onMoved))
                 return
             }
             tally.skipped.append(wasPartly ? name + ", partly" : name)
@@ -104,7 +105,7 @@ public func appStep<V>(pid: pid_t, wanted: [UInt32: V], system: WindowSystem, wo
             guard let id = maybeID, let value = wanted[id] else { continue }
             pos += 1
             ctx.insert({ _ in
-                if dead.on || !gate() { return nil }
+                if dead.on || !gate() || skip(id) { return nil }
                 let t1 = Date()
                 let ok = await worker.run { (try? action(win, value)) != nil }
                 guard gate() else { return nil }   // the screens changed meanwhile: it belongs to the old setup

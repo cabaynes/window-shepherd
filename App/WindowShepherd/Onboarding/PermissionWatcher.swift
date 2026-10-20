@@ -32,7 +32,12 @@ final class PermissionWatcher {
         } : nil
     }
 
+    /// Ask macOS to add Window Shepherd to the Accessibility list (it only
+    /// appears there once the app has asked with the prompt option), then open
+    /// that pane so it's one switch away.
     static func openSettings() {
+        let prompt = kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String
+        _ = AXIsProcessTrustedWithOptions([prompt: true] as CFDictionary)
         NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!)
     }
 }
