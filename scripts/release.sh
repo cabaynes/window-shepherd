@@ -15,6 +15,7 @@ scripts/fetch-sparkle.sh
 mkdir -p dist build
 
 SIGNED=0
+EXTRA_SETTINGS=()
 if [ -n "${DEVELOPER_ID_NAME:-}" ]; then
   SIGNED=1
   IDENTITY="Developer ID Application: $DEVELOPER_ID_NAME"
@@ -23,12 +24,15 @@ else
   echo "Apple Developer enrollment needed for a signed release — see docs/RELEASING.md."
   echo "Building an unsigned DMG for local packaging tests instead."
   IDENTITY="-"
+  # Ad-hoc signing has no Team ID, so the hardened runtime would refuse the
+  # embedded Sparkle unless library validation is relaxed (as in Debug builds).
+  EXTRA_SETTINGS=("CODE_SIGN_ENTITLEMENTS=$PWD/App/WindowShepherd/WindowShepherd-Debug.entitlements")
 fi
 
 xcodebuild -project App/WindowShepherd.xcodeproj -scheme WindowShepherd -configuration Release \
   -derivedDataPath build/DerivedData \
   CODE_SIGN_IDENTITY="$IDENTITY" OTHER_CODE_SIGN_FLAGS="--timestamp" \
-  MARKETING_VERSION="$VERSION" CURRENT_PROJECT_VERSION="$BUILD" build >build/release.log 2>&1 \
+  MARKETING_VERSION="$VERSION" CURRENT_PROJECT_VERSION="$BUILD" ${EXTRA_SETTINGS[@]+"${EXTRA_SETTINGS[@]}"} build >build/release.log 2>&1 \
   || { grep -E "error:" build/release.log | head -20; echo "build failed: build/release.log"; exit 1; }
 APP="build/DerivedData/Build/Products/Release/Window Shepherd.app"
 
@@ -37,6 +41,17 @@ notarize() {   # notarize <file> — waits for Apple's verdict
 }
 
 if [ "$SIGNED" = 1 ]; then
+  # Sparkle ships its helpers signed ad-hoc; notarization needs every one
+  # signed with our Developer ID and the hardened runtime, inside out
+  # (https://sparkle-project.org/documentation/sandboxing/#code-signing).
+  FW="$APP/Contents/Frameworks/Sparkle.framework"
+  sign() { codesign -f -s "$IDENTITY" -o runtime --timestamp "$@"; }
+  sign "$FW/Versions/B/XPCServices/Installer.xpc"
+  sign --preserve-metadata=entitlements "$FW/Versions/B/XPCServices/Downloader.xpc"
+  sign "$FW/Versions/B/Autoupdate"
+  sign "$FW/Versions/B/Updater.app"
+  sign "$FW"
+  sign --entitlements App/WindowShepherd/WindowShepherd.entitlements "$APP"
   codesign --verify --deep --strict --verbose=2 "$APP"
   ditto -c -k --keepParent "$APP" build/notarize.zip
   notarize build/notarize.zip

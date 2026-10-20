@@ -30,7 +30,7 @@ public enum SystemShortcuts {
         for (id, raw) in all {
             guard let e = raw as? [String: Any], (e["enabled"] as? Bool) == true,
                   let value = e["value"] as? [String: Any], let p = value["parameters"] as? [Int], p.count >= 3,
-                  p[1] != 65535, let key = KeyCodes.name(for: UInt16(p[1])),
+                  p[1] != 65535, let code = UInt16(exactly: p[1]), let key = KeyCodes.name(for: code),
                   let c = Conflicts.fromSymbolic(keyName: key, flags: p[2]) else { continue }
             names[c.id] = Int(id).flatMap { KnownShortcuts.shared.system[$0] } ?? "a macOS shortcut"
         }

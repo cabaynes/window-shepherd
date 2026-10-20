@@ -22,6 +22,7 @@ osascript -e 'application id "com.windowshepherd.WindowShepherd" is running' | g
 osascript -e 'application id "com.knollsoft.Rectangle" is running' | grep -q true \
   && { echo "Rectangle is running, so Window Shepherd's window keys are off. Quit Rectangle first."; exit 1; }
 
+rm -f /tmp/ws-e2e-testwindows.out   # never read a previous run's window ids
 .build/debug/TestWindows 3 --title-prefix WSTEST >/tmp/ws-e2e-testwindows.out 2>&1 &
 TW=$!
 trap 'kill $TW 2>/dev/null' EXIT

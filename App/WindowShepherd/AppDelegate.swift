@@ -85,6 +85,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         shepherd.start()
         binder.active = true
         announce()
+        #if !DEBUG
+        // On by default: the first time the app runs with the permission and no
+        // onboarding window is asking, switch Launch at Login on (once).
+        if !LaunchAtLogin.decided && onboardingWindow == nil { LaunchAtLogin.set(true) }
+        #endif
     }
 
     private func announce() {
@@ -98,6 +103,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if trusted {
             activate()
             onboarding?.granted = true
+            NSApp.activate()
             onboardingWindow?.makeKeyAndOrderFront(nil)
         } else {
             shepherd.paused = true
@@ -126,6 +132,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         w.makeKeyAndOrderFront(nil)
         NotificationCenter.default.addObserver(forName: NSWindow.willCloseNotification, object: w, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated {
+                // Closing "You're all set" counts like Done: apply what the checkbox shows.
+                if let model = self?.onboarding, model.granted { self?.applyLoginChoice(model) }
                 self?.permission.pollWhileVisible(false)
                 self?.onboardingWindow = nil
                 self?.onboarding = nil
@@ -137,8 +145,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func finishOnboarding() {
-        if let model = onboarding, model.launchAtLogin != LaunchAtLogin.isEnabled { LaunchAtLogin.set(model.launchAtLogin) }
-        onboardingWindow?.close()
+        onboardingWindow?.close()   // the close handler applies the login choice
+    }
+
+    private func applyLoginChoice(_ model: OnboardingModel) {
+        if model.launchAtLogin != LaunchAtLogin.isEnabled { LaunchAtLogin.set(model.launchAtLogin) }
+        LaunchAtLogin.decided = true
     }
 
     // MARK: Menu actions
@@ -155,7 +167,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         case .customize:
             if settings == nil { settings = SettingsWindowController(target: binder) }
             settings?.show()
-        case .launchAtLogin: LaunchAtLogin.set(!LaunchAtLogin.isEnabled)
+        case .launchAtLogin: LaunchAtLogin.toggle()
         case .about: AboutPanel.show()
         case .checkForUpdates: updater.checkForUpdates()
         case .grantAccess: showOnboarding()

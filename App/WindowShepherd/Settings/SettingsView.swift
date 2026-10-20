@@ -116,9 +116,11 @@ struct SettingsView: View {
                     .opacity(r.isDefault ? 0 : 1)
                     .disabled(r.isDefault)
                     .frame(width: 20)
-                chips(r.chips)
                 Spacer(minLength: 0)
             }
+            // Derived shortcuts on their own line, under the box, so a row never
+            // runs past the window (the prototype's chips wrapped too).
+            if !r.chips.isEmpty { chips(r.chips).padding(.leading, 160) }
             messages(entry: r.entry, level: r.level, text: r.text)
         }
         .padding(.vertical, 8)
@@ -228,10 +230,10 @@ struct SettingsView: View {
                         .buttonStyle(.plain)
                     }
                 }
-                if let note { Text(note).font(.callout).foregroundStyle(.secondary) }
-                chips(list)
                 Spacer(minLength: 0)
             }
+            if let note { Text(note).font(.callout).foregroundStyle(.secondary).padding(.leading, 160) }
+            if !list.isEmpty { chips(list).padding(.leading, 160) }
             messages(entry: entry, level: nil, text: nil)
         }
         .padding(.vertical, 8)

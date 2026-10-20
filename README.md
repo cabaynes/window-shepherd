@@ -68,7 +68,7 @@ The rule this app is built around: **nothing may hang or slow the Mac.** Window 
 - **Every question to an app times out after 0.5 s**, and the main thread never asks. All Accessibility calls run on background queues, so the menu, the shortcuts and the ⧉ icon stay responsive whatever other apps are doing.
 - **"Busy" isn't "hung".** Safari can take 0.3–0.4 s to resize a window while it re-lays out pages. An app is called "not responding" only if it can't even list its windows, or one window takes over 0.8 s. It's then retried 2 s and 4 s later, and named, not dropped silently. For two minutes afterwards, the menu offers "Retry N windows that didn't move".
 - **Work is done one window at a time** with a hard deadline per job. A new move interrupts an old one, and a keyboard snap never waits behind a restore. Each app has its own lane, so a hung app delays only itself.
-- **The only polling is a cheap 2-second check** of the screen setup. It reads the window list only, which also catches screen changes macOS forgot to announce (after sleep, for example).
+- **The only polling is a cheap 2-second check** of the screen setup. It reads the window list only, which also catches screen changes macOS forgot to announce (after sleep, for example). The one other timer is a once-a-second permission check, and it runs only while the first-run window is open.
 - **The ⧉ turns red** while a move or restore is running, so you know when to keep your hands off.
 
 The engine is covered by more than 140 unit tests. They include a fake "hung app" that must not delay the main thread or other apps, screens unplugged mid-move, and restores you interrupt by moving a window yourself.
@@ -93,7 +93,7 @@ scripts/build.sh Debug     # generates the Xcode project and builds the app
 scripts/run-dev.sh         # builds and opens it
 ```
 
-Builds are signed ad-hoc by default. To keep the Accessibility permission across rebuilds, put your own signing identity in `Config/Local.xcconfig` (gitignored):
+Builds are signed ad-hoc by default. Use Debug for ad-hoc builds: an ad-hoc *Release* build can't load the embedded update framework under the hardened runtime (`scripts/release.sh` handles this for its unsigned test DMG). To keep the Accessibility permission across rebuilds, put your own signing identity in `Config/Local.xcconfig` (gitignored):
 
 ```
 CODE_SIGN_IDENTITY = Apple Development
@@ -109,7 +109,7 @@ CODE_SIGN_IDENTITY = Apple Development
 | `App/WindowShepherd/` | The menu-bar app: status menu, Carbon hotkeys, Customize Shortcuts window, onboarding, updates |
 | `Tests/` | Unit tests (`swift test`) |
 | `Sources/wsctl`, `Sources/TestWindows` | Developer tools used by `scripts/e2e.sh` |
-| `docs/` | The implementation plan, the parity checklist, release notes for maintainers |
+| `docs/` | The implementation plan, the parity checklist, [RELEASING.md](docs/RELEASING.md) (how a signed release is made) |
 
 ## From a script to an app
 

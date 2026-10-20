@@ -20,7 +20,7 @@ struct OnboardingView: View {
                     .font(.title2.weight(.semibold))
             }
             if model.granted {
-                Text("Window Shepherd is in your menu bar (⧉). Press ⌥⌘G to make the window in front 90%, or open the ⧉ menu to see everything it can do.")
+                Text("Window Shepherd is in your menu bar (⧉). Open the ⧉ menu to see everything it can do, and the keyboard shortcut for each (⌥⌘G makes the window in front 90%, for example).")
                     .fixedSize(horizontal: false, vertical: true)
                 Toggle("Start Window Shepherd at login", isOn: $model.launchAtLogin)
                 HStack {
