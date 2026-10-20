@@ -10,7 +10,7 @@ let args = Array(CommandLine.arguments.dropFirst())
 func fmt(_ r: CGRect) -> String { String(format: "%.0f %.0f %.0f %.0f", r.minX, r.minY, r.width, r.height) }
 
 func usage() -> Never {
-    print("usage: wsctl screens | windows | move <id> <x> <y> <w> <h> | check <title> <n|own> <x y w h|center>")
+    print("usage: wsctl screens | windows | move <id> <x> <y> <w> <h> | scan | check <title> <n|own> <x y w h|center>")
     exit(2)
 }
 
@@ -34,6 +34,21 @@ case "move":
     guard let win = handle(for: id) else { print("no window \(id)"); exit(1) }
     do { try win.setFrame(CGRect(x: x, y: y, width: w, height: h)); print("moved") }
     catch { print("failed: \(error)"); exit(1) }
+case "scan":
+    // Runs the Customize Shortcuts clash scan and prints what it found.
+    let t0 = Date()
+    let combos = derive(.defaults).map(\.combo)
+    MainActor.assumeIsolated {
+        _ = ClashScanner().start(combos: combos, onUpdate: { _, done, total in
+            if done == 0 { print("scanning \(total) apps…") }
+        }, onDone: { sources in
+            print("system clashes with the defaults: \(sources.system.map { "\($0.combo.formatted) \($0.name)" })")
+            print("app shortcuts known: \(sources.apps.count)")
+            print(String(format: "took %.2fs", Date().timeIntervalSince(t0)))
+            exit(0)
+        })
+    }
+    RunLoop.main.run()
 case "check":
     // check <title> <screen|own> <x> <y> <w> <h>  — is the window at that unit rect? (±3 pt)
     // check <title> <screen|own> center            — centred on that screen?
