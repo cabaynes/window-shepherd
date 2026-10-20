@@ -3,12 +3,6 @@ import XCTest
 
 @MainActor
 final class JobRunnerTests: XCTestCase {
-    /// Waits (without blocking the main actor) until `cond` holds or `timeout` passes.
-    func waitUntil(_ timeout: TimeInterval = 2, _ cond: @escaping () -> Bool) async {
-        let end = Date().addingTimeInterval(timeout)
-        while !cond() && Date() < end { try? await Task.sleep(nanoseconds: 5_000_000) }
-    }
-
     func testRunsStepsInOrderAndInsertions() async {
         let r = JobRunner()
         var log: [String] = []
