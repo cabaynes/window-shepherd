@@ -36,15 +36,9 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
     func setBusy(_ busy: Bool) {
         guard busy != busyShown, let button = item.button else { return }
         busyShown = busy
-        if busy {
-            button.attributedTitle = NSAttributedString(string: " ⧉ ", attributes: [
-                .foregroundColor: NSColor.white,
-                .backgroundColor: NSColor(calibratedRed: 0.85, green: 0.1, blue: 0.1, alpha: 1),
-                .font: NSFont.menuBarFont(ofSize: 0),
-            ])
-        } else {
-            button.attributedTitle = NSAttributedString(string: "⧉", attributes: [.font: NSFont.menuBarFont(ofSize: 0)])
-        }
+        button.title = ""
+        button.imagePosition = .imageOnly
+        button.image = MenuBarGlyph.image(busy: busy)
     }
 
     func updateTooltip() {
