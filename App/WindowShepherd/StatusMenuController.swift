@@ -74,6 +74,60 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
         updateTooltip()
     }
 
+    // MARK: Clicking a row that has a submenu
+
+    // NSMenu ignores a click on a row with a submenu. While the menu is open, a
+    // listen-only mouse tap notices one and runs that row's "This window"
+    // choice; hovering still opens the submenu as before.
+    private var clickTap: CFMachPort?
+    private var clickSource: CFRunLoopSource?
+    private var mainMenuWindow: NSWindow?
+
+    func menuWillOpen(_ menu: NSMenu) {
+        guard menu === self.menu, clickTap == nil else { return }
+        let me = Unmanaged.passUnretained(self).toOpaque()
+        guard let tap = CGEvent.tapCreate(tap: .cgSessionEventTap, place: .headInsertEventTap, options: .listenOnly,
+                                          eventsOfInterest: CGEventMask(1 << CGEventType.leftMouseUp.rawValue),
+                                          callback: { _, type, event, info in
+            if type == .leftMouseUp, let info {
+                let me = Unmanaged<StatusMenuController>.fromOpaque(info).takeUnretainedValue()
+                DispatchQueue.main.async { MainActor.assumeIsolated { me.mouseUp() } }
+            }
+            return Unmanaged.passUnretained(event)
+        }, userInfo: me) else { return }   // no tap: the submenu's "This window" row still works
+        clickTap = tap
+        clickSource = CFMachPortCreateRunLoopSource(nil, tap, 0)
+        CFRunLoopAddSource(CFRunLoopGetMain(), clickSource, .commonModes)
+        CGEvent.tapEnable(tap: tap, enable: true)
+    }
+
+    func menuDidClose(_ menu: NSMenu) {
+        guard menu === self.menu, let tap = clickTap else { return }
+        CGEvent.tapEnable(tap: tap, enable: false)
+        if let clickSource { CFRunLoopRemoveSource(CFRunLoopGetMain(), clickSource, .commonModes) }
+        CFMachPortInvalidate(tap)
+        clickTap = nil
+        clickSource = nil
+        mainMenuWindow = nil
+    }
+
+    func menu(_ menu: NSMenu, willHighlight item: NSMenuItem?) {
+        if menu === self.menu, item != nil { mainMenuWindow = menuWindow(at: NSEvent.mouseLocation) ?? mainMenuWindow }
+    }
+
+    private func mouseUp() {
+        guard let row = menu.highlightedItem, let sub = row.submenu, let box = row.representedObject as? ActionBox,
+              sub.highlightedItem == nil else { return }   // on a submenu row: that row's own click runs it
+        // Over the submenu (a separator, its edge)? Only a click on the main menu counts.
+        if let here = menuWindow(at: NSEvent.mouseLocation), let main = mainMenuWindow, here !== main { return }
+        menu.cancelTracking()
+        DispatchQueue.main.async { [hooks] in hooks.perform(box.action) }
+    }
+
+    private func menuWindow(at p: NSPoint) -> NSWindow? {
+        NSApp.windows.filter { $0.isVisible && $0.frame.contains(p) && $0.level >= .popUpMenu }.max { $0.level < $1.level }
+    }
+
     // MARK: Rendering
 
     private final class ActionBox: NSObject {
@@ -122,6 +176,10 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
             case let .submenu(title, keys, children):
                 let mi = NSMenuItem(title: title, action: nil, keyEquivalent: "")
                 if let keys { mi.attributedTitle = withKeys(title, keys, tabAt: tabAt, font: font) }
+                // Clicking the row itself does its "This window" choice (see ClickThrough).
+                if case let .item(first, _, action, _)? = children.first, first.hasPrefix("This window") {
+                    mi.representedObject = ActionBox(action)
+                }
                 let sub = NSMenu(title: title)
                 render(children, into: sub)
                 mi.submenu = sub
