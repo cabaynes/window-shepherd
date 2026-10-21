@@ -11,7 +11,9 @@ Non-technical founder. See universal `user_profile.md` for collaboration prefere
 - **Hard rule (inherited): nothing may hang or slow the Mac.**
 - Published under Charles's own name (individual Apple Developer enrollment — pending). Buy Me a Coffee tip link on the website and at the bottom of Customize Shortcuts.
 
-The approved design: `~/CLAUDE/window-mover/docs/superpowers/specs/2026-10-19-window-shepherd-app-design.md`. Background, APIs and hard-won lessons: `~/CLAUDE/window-mover/docs/window-mover-app-idea.md`. Reference implementation: `~/CLAUDE/window-mover/hammerspoon/`.
+Design docs (private, out of repo) in `~/.claude/putdowns/window-shepherd/reference/`: the approved design `2026-10-19-window-shepherd-app-design.md`; background, APIs and hard-won lessons `window-mover-app-idea.md`; the Customize Shortcuts design and plan. Reference implementation: `~/CLAUDE/window-mover/hammerspoon/`.
+
+**All work happens here.** The window-mover folder is frozen (2026-10-21), kept only for reference and as the backup Hammerspoon runs until parity sign-off; don't open or change it.
 
 ## Repo layout
 - `Sources/WindowShepherdCore/` — everything testable without a screen (shortcut model, clash rules, geometry, job runner, move engine `Engine/Shepherd*.swift`, auto-restore `Restore/`, menu model, clash scanner). `swift test` runs its tests.
@@ -26,7 +28,7 @@ The approved design: `~/CLAUDE/window-mover/docs/superpowers/specs/2026-10-19-wi
 - This repo is **public**: no secrets (signing certificates, notarization credentials, Sparkle private key), no private notes. Putdowns and OPEN-THREADS.md live out of repo at `~/.claude/putdowns/window-shepherd/`.
 
 ## External references
-- Hammerspoon reference: `~/CLAUDE/window-mover` (repo cabaynes/window-mover, private)
+- Hammerspoon reference: `~/CLAUDE/window-mover` (repo cabaynes/window-mover, private; frozen 2026-10-21)
 - Domain: windowshepherd.com (Squarespace DNS)
 
 ## Notes
@@ -34,3 +36,5 @@ The approved design: `~/CLAUDE/window-mover/docs/superpowers/specs/2026-10-19-wi
 - Dev builds are signed with the identity in `Config/Local.xcconfig` (gitignored) so the Accessibility grant survives rebuilds; Debug carries `disable-library-validation` for the embedded Sparkle (Release won't).
 - The Hammerspoon mover (window-mover repo) pauses only while the app posts `com.windowshepherd.WindowShepherd.active` = "1".
 - No Rectangle code was copied, so LICENSE carries no Rectangle notice.
+- Moves switch off an app's `AXEnhancedUserInterface` for the move (Rectangle's workaround): with it on, Chrome kept new sizes but dropped new positions. Never re-send a position.
+- macOS 26 credits a menu bar icon to the app that launched the program: launched from Claude in VS Code, Window Shepherd's ⧉ hid until "Visual Studio Code" was allowed in System Settings → Menu Bar.
