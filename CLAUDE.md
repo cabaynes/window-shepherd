@@ -18,7 +18,7 @@ Design docs (private, out of repo) in `~/.claude/putdowns/window-shepherd/refere
 ## Repo layout
 - `Sources/WindowShepherdCore/` — everything testable without a screen (shortcut model, clash rules, geometry, job runner, move engine `Engine/Shepherd*.swift`, auto-restore `Restore/`, menu model, clash scanner). `swift test` runs its tests.
 - `App/` — the menu-bar app (XcodeGen `project.yml`; `App/*.xcodeproj` is generated, never committed). `scripts/build.sh [Debug|Release]` builds; `scripts/run-dev.sh` builds and opens.
-- `Sources/wsctl`, `Sources/TestWindows` — dev tools; `scripts/e2e.sh` presses real keys on test windows (run from Terminal with permissions, not from Claude's shell).
+- `Sources/wsctl`, `Sources/TestWindows` — dev tools; `scripts/e2e.sh` presses real keys on test windows (run from Terminal with permissions, not from Claude's shell). `wsctl front 10` (Terminal) prints the front app's windows in on-screen order vs. the one with keyboard focus. Debug launch flag `-WSSnapshotSettings <png>` draws the whole Customize Shortcuts window to a file, since Claude can't take screenshots.
 - `vendor/Sparkle` — fetched by `scripts/fetch-sparkle.sh` (pinned version + SHA-256), gitignored.
 - `docs/superpowers/plans/` — the v1 plan; `docs/parity-checklist.md` — what must be verified before the Hammerspoon mover is retired.
 
