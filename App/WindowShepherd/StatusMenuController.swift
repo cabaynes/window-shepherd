@@ -52,8 +52,18 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
         item.button?.toolTip = "Move windows between screens (or press \(key) anywhere)"
     }
 
+    /// Opens at the mouse, but moved up (or left) as far as it takes to show
+    /// the whole menu: near the bottom of a screen NSMenu would make it scroll.
     func popUpAtMouse() {
-        menu.popUp(positioning: nil, at: NSEvent.mouseLocation, in: nil)
+        let mouse = NSEvent.mouseLocation
+        menuNeedsUpdate(menu)   // build it now, so it can be measured
+        var at = mouse          // the menu's top-left corner
+        if let vf = NSScreen.screens.first(where: { NSMouseInRect(mouse, $0.frame, false) })?.visibleFrame {
+            let size = menu.size
+            if at.y - size.height < vf.minY { at.y = min(vf.maxY, vf.minY + size.height) }
+            if at.x + size.width > vf.maxX { at.x = max(vf.minX, vf.maxX - size.width) }
+        }
+        menu.popUp(positioning: nil, at: at, in: nil)
     }
 
     // MARK: NSMenuDelegate
