@@ -25,8 +25,20 @@ private func color(_ level: Finding.Level?) -> Color? {
     }
 }
 
+/// The list beside each box is set a size smaller, so a row stays short.
+private let listFont = Font.system(size: 11)
+private let modSymbols: Set<Character> = ["⌃", "⌥", "⌘", "⇧"]
+
+/// One clash to list: the shortcut and what it clashes with.
+private struct Clash: Hashable {
+    let keys: String
+    let text: String
+    let level: Finding.Level
+}
+
 struct SettingsView: View {
     @ObservedObject var model: SettingsModel
+    var height: CGFloat = 780
     private var flow: SettingsFlow { model.flow }
 
     var body: some View {
@@ -34,21 +46,27 @@ struct SettingsView: View {
         VStack(alignment: .leading, spacing: 0) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
-                    section("This window") { rows(vm.rows.filter { $0.section == "This window" }) }
+                    section("Move the window you're using",
+                            intro: "Each shortcut moves the window you're using. The list beside it is the same move "
+                                 + "with one extra key (set under Extra keys): for every window of that app, onto the "
+                                 + "next screen, or both.") {
+                        rows(vm.rows.filter { $0.section == "This window" })
+                    }
                     section("Corners") { rows(vm.rows.filter { $0.section == "Corners" }) }
-                    section("Add a key") {
+                    section("Extra keys", intro: "Hold one more key with any shortcut above.") {
                         modifierRow(name: "Every window of the app", entry: .wholeApp,
-                                    note: "added to each shortcut above that doesn't already have it",
+                                    note: example(vm, .wholeApp),
                                     isOn: { $0 == vm.wholeApp }) { flow.setModifier(.wholeApp, $0) }
                         Divider()
-                        modifierRow(name: "On the next screen", entry: .nextScreen, note: nil,
+                        modifierRow(name: "On the next screen", entry: .nextScreen, note: example(vm, .nextScreen),
                                     isOn: { $0 == vm.nextScreen }) { flow.setModifier(.nextScreen, $0) }
                     }
-                    section("Screens (1 = laptop, then monitors left to right)") {
-                        modifierRow(name: "Move to screen n", entry: .screenBase, note: nil, chips: vm.screenChips,
+                    section("Send to a screen",
+                            intro: "Press these keys plus a screen's number: 1 is the laptop, then monitors from left to right.") {
+                        modifierRow(name: "Keys for screen n", entry: .screenBase, note: nil, list: vm.screenChips,
                                     isOn: { vm.screenBase.contains($0) }) { flow.toggleScreenMod($0) }
                     }
-                    section("Menu") { rows([vm.menu]) }
+                    section("Open the menu") { rows([vm.menu]) }
                 }
                 .padding(.horizontal, 20)
                 .padding(.bottom, 8)
@@ -76,19 +94,26 @@ struct SettingsView: View {
             .padding(.vertical, 12)
             .background(Color(nsColor: .windowBackgroundColor))
         }
-        .frame(width: 680, height: 780)
+        .frame(width: 680, height: height)
         .background(Color(nsColor: .windowBackgroundColor))
     }
 
     // MARK: Pieces
 
-    private func section<Content: View>(_ title: String, @ViewBuilder _ content: () -> Content) -> some View {
+    private func section<Content: View>(_ title: String, intro: String? = nil,
+                                        @ViewBuilder _ content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text(title.uppercased())
-                .font(.system(size: 11, weight: .semibold))
-                .tracking(0.6)
+            Text(title)
+                .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(.primary)
                 .padding(.top, 18)
+            if let intro {
+                Text(intro)
+                    .font(.callout)
+                    .foregroundStyle(.primary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.bottom, 2)
+            }
             VStack(alignment: .leading, spacing: 0) { content() }
                 .padding(.horizontal, 12)
                 .background(RoundedRectangle(cornerRadius: 10).fill(Color(nsColor: .controlBackgroundColor)))
@@ -105,25 +130,35 @@ struct SettingsView: View {
     }
 
     private func row(_ r: RowVM) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 10) {
-                Text(r.name).fontWeight(.medium).frame(width: 150, alignment: .leading)
+        let deciding = pendingChoice(r.entry)
+        // The menu row has no list: its one shortcut is the whole story.
+        let list = r.chips.isEmpty ? [] : [ChipVM(label: "This window", keys: r.keys, level: r.level, text: r.text)] + r.chips
+        return VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .top, spacing: 10) {
+                Text(r.name).fontWeight(.medium).frame(width: 150, alignment: .leading).padding(.top, 4)
                 recorderBox(r)
-                Button { flow.reset(r.entry) } label: { Text("↺").font(.system(size: 15)) }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(.primary)
-                    .help("Back to the default")
-                    .opacity(r.isDefault ? 0 : 1)
-                    .disabled(r.isDefault)
-                    .frame(width: 20)
+                resetButton(r).padding(.top, 4)
+                if deciding {
+                    // Right beside the box, so the choice is where your eyes are.
+                    choiceButtons
+                } else if !list.isEmpty {
+                    variantList(list, base: r.keys).padding(.leading, 12)
+                }
                 Spacer(minLength: 0)
             }
-            // Derived shortcuts on their own line, under the box, so a row never
-            // runs past the window (the prototype's chips wrapped too).
-            if !r.chips.isEmpty { chips(r.chips).padding(.leading, 160) }
-            messages(entry: r.entry, level: r.level, text: r.text)
+            messages(entry: r.entry, clashes: deciding ? [] : clashes(list.isEmpty ? [ChipVM(label: "", keys: r.keys, level: r.level, text: r.text)] : list))
         }
         .padding(.vertical, 8)
+    }
+
+    private func resetButton(_ r: RowVM) -> some View {
+        Button { flow.reset(r.entry) } label: { Text("↺").font(.system(size: 15)) }
+            .buttonStyle(.plain)
+            .foregroundStyle(.primary)
+            .help("Back to the default")
+            .opacity(r.isDefault ? 0 : 1)
+            .disabled(r.isDefault)
+            .frame(width: 20)
     }
 
     private func recorderBox(_ r: RowVM) -> some View {
@@ -134,7 +169,7 @@ struct SettingsView: View {
         return Button {
             if recording { flow.stopRecording() } else { flow.record(r.entry) }
         } label: {
-            Text(recording ? (flow.recordHint ?? "Press keys… (Esc to cancel)") : r.keys)
+            Text(recording ? (flow.recordHint ?? "Press keys… (Esc to cancel)") : (pendingKeys(r.entry) ?? r.keys))
                 .font(.system(size: recording ? 12 : 14))
                 .foregroundStyle(.primary)
                 .frame(width: 120, height: 26)
@@ -146,58 +181,111 @@ struct SettingsView: View {
         .help(r.text ?? "Click, then press the new shortcut")
     }
 
-    private func chips(_ list: [ChipVM]) -> some View {
-        HStack(spacing: 6) {
+    /// "This window ⌥⌘←" then each extra-key version, the added keys drawn in
+    /// the accent colour so you can see what each line adds.
+    private func variantList(_ list: [ChipVM], base: String) -> some View {
+        Grid(alignment: .leading, horizontalSpacing: 6, verticalSpacing: 2) {
             ForEach(list, id: \.label) { c in
-                Group {
+                GridRow {
+                    Text(c.label).foregroundStyle(.primary).fixedSize()
+                    // ⚠ in its own column, so every shortcut starts at the same place.
+                    Text(c.level != nil ? "⚠" : "").foregroundStyle(color(c.level) ?? .primary)
                     if let keys = c.keys {
-                        HStack(spacing: 4) {
-                            if c.level != nil { Text("⚠") }
-                            Text(keys)
-                            Text(c.label).font(.caption).foregroundStyle(.primary)
-                        }
+                        keysText(keys, base: c.label == "This window" ? keys : base, level: c.level)
+                            .fixedSize()
+                            .help(c.text ?? "")
                     } else {
-                        HStack(spacing: 4) {
-                            Text(c.label + ":").font(.caption).foregroundStyle(.primary)
-                            Text("menu only")
-                        }
+                        Text("Menu only").foregroundStyle(.primary).fixedSize()
+                            .help("This shortcut already uses that extra key, so this version is only in the ⧉ menu.")
                     }
                 }
-                .foregroundStyle(color(c.level) ?? .primary)
-                .padding(.horizontal, 7)
-                .padding(.vertical, 2)
-                .background(RoundedRectangle(cornerRadius: 5).fill(
-                    c.level == .block ? Palette.redBG : c.level == .warn ? Palette.amberBG : Color(nsColor: .quaternaryLabelColor).opacity(0.5)))
-                .help(c.text ?? "")
-                .fixedSize()
             }
+        }
+        .font(listFont)
+    }
+
+    private func keysText(_ keys: String, base: String, level: Finding.Level?) -> Text {
+        let baseMods = Set(base.filter { modSymbols.contains($0) })
+        let plain = color(level) ?? .primary
+        return keys.reduce(Text("")) { out, ch in
+            let added = modSymbols.contains(ch) && !baseMods.contains(ch)
+            return out + Text(String(ch)).foregroundColor(added ? .accentColor : plain).fontWeight(added ? .bold : .regular)
         }
     }
 
+    // MARK: Clashes
+
+    private func clashes(_ list: [ChipVM]) -> [Clash] {
+        list.compactMap { c in
+            guard let keys = c.keys, let level = c.level, let text = c.text else { return nil }
+            return Clash(keys: keys, text: text, level: level)
+        }
+    }
+
+    private func pendingChoice(_ entry: Entry) -> Bool {
+        guard let p = flow.pending, p.entry == entry, flow.errors[entry.key] == nil else { return false }
+        return !p.waiting
+    }
+
+    private func pendingKeys(_ entry: Entry) -> String? {
+        guard let p = flow.pending, p.entry == entry else { return nil }
+        return p.keys
+    }
+
+    private var choiceButtons: some View {
+        HStack(spacing: 8) {
+            Button("Save anyway") { flow.keep() }.keyboardShortcut(.defaultAction)
+            Button("Cancel") { flow.cancel() }.keyboardShortcut(.cancelAction)
+        }
+        .padding(.leading, 12)
+    }
+
     @ViewBuilder
-    private func messages(entry: Entry, level: Finding.Level?, text: String?) -> some View {
+    private func messages(entry: Entry, clashes: [Clash]) -> some View {
         if let err = flow.errors[entry.key] {
             message(err, level: .block)
         } else if let p = flow.pending, p.entry == entry {
             if p.waiting {
                 message("Checking your open apps… \(p.keys ?? "") will be set when that's done (keep this window open).", level: .warn)
             } else {
-                VStack(alignment: .leading, spacing: 6) {
-                    ForEach(p.warns, id: \.self) { Text($0) }
-                    HStack {
-                        Button("Keep \(p.keys ?? "it")") { flow.keep() }.keyboardShortcut(.defaultAction)
-                        Button("Cancel") { flow.cancel() }
-                    }
-                }
-                .font(.callout)
-                .foregroundStyle(Palette.amber)
-                .padding(8)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(RoundedRectangle(cornerRadius: 6).fill(Palette.amberBG))
+                // Judge writes each as "⌘C — Safari: Copy. Yours will win."
+                clashBox(p.warns.map { w in
+                    let parts = w.components(separatedBy: " — ")
+                    return Clash(keys: parts.count > 1 ? parts[0] : "", text: parts.dropFirst().joined(separator: " — "), level: .warn)
+                })
             }
-        } else if let level, let text {
-            message(text, level: level)
+        } else if !clashes.isEmpty {
+            clashBox(clashes)
         }
+    }
+
+    private func clashBox(_ list: [Clash]) -> some View {
+        let blocked = list.contains { $0.level == .block }
+        // "Yours will win." ends every app clash: say it once, in the heading.
+        let wins = " Yours will win."
+        let anyWins = list.contains { $0.text.hasSuffix(wins) }
+        let title = (list.count == 1 ? "Potential conflict" : "Potential conflicts") + (anyWins ? " (Window Shepherd wins)" : "")
+        return VStack(alignment: .leading, spacing: 3) {
+            Text(title)
+                .fontWeight(.semibold)
+                .foregroundStyle(blocked ? Palette.red : Palette.amber)
+            Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 10, verticalSpacing: 2) {
+                ForEach(list, id: \.self) { c in
+                    GridRow {
+                        Text(c.keys).fontWeight(.medium)
+                        Text(c.text.hasSuffix(wins) ? String(c.text.dropLast(wins.count)) : c.text)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .foregroundStyle(c.level == .block ? Palette.red : Palette.amber)
+                }
+            }
+        }
+        .font(listFont)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 6)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 6).fill(blocked ? Palette.redBG : Palette.amberBG))
+        .padding(.leading, 160)
     }
 
     private func message(_ text: String, level: Finding.Level) -> some View {
@@ -209,11 +297,28 @@ struct SettingsView: View {
             .background(RoundedRectangle(cornerRadius: 6).fill(level == .block ? Palette.redBG : Palette.amberBG))
     }
 
-    private func modifierRow(name: String, entry: Entry, note: String?, chips list: [ChipVM] = [],
+    // MARK: Extra keys and screens
+
+    /// A worked example from your own Left half keys, so it stays true after you change them.
+    private func example(_ vm: SettingsVM, _ entry: Entry) -> String? {
+        guard let left = vm.rows.first(where: { $0.entry == .action(.leftHalf) }) else { return nil }
+        switch entry {
+        case .wholeApp:
+            guard let all = left.chips.first(where: { $0.label == "Every window of the app" })?.keys else { return nil }
+            return "\(left.keys) puts the window you're using on the left half; \(all) does that to all of that app's windows."
+        case .nextScreen:
+            guard let next = left.chips.first(where: { $0.label == "On the next screen" })?.keys else { return nil }
+            return "\(next) puts the window you're using on the left half of the next screen."
+        default:
+            return nil
+        }
+    }
+
+    private func modifierRow(name: String, entry: Entry, note: String?, list: [ChipVM] = [],
                              isOn: @escaping (Mod) -> Bool, tap: @escaping (Mod) -> Void) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 10) {
-                Text(name).fontWeight(.medium).frame(width: 150, alignment: .leading)
+            HStack(alignment: .top, spacing: 10) {
+                Text(name).fontWeight(.medium).frame(width: 150, alignment: .leading).padding(.top, 4)
                 HStack(spacing: 6) {
                     ForEach(Mod.allCases, id: \.self) { m in
                         Button { tap(m) } label: {
@@ -230,11 +335,17 @@ struct SettingsView: View {
                         .buttonStyle(.plain)
                     }
                 }
+                if !list.isEmpty {
+                    variantList(list, base: list.first?.keys ?? "").padding(.leading, 12)
+                }
                 Spacer(minLength: 0)
             }
-            if let note { Text(note).font(.callout).foregroundStyle(.primary).padding(.leading, 160) }
-            if !list.isEmpty { chips(list).padding(.leading, 160) }
-            messages(entry: entry, level: nil, text: nil)
+            if let note {
+                Text(note).font(listFont).foregroundStyle(.primary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.leading, 160)
+            }
+            messages(entry: entry, clashes: clashes(list))
         }
         .padding(.vertical, 8)
     }

@@ -1,11 +1,15 @@
 import Foundation
 
-/// A derived shortcut shown beside a box ("⌃⌥⌘G whole app"); keys nil = menu only.
+/// A derived shortcut listed beside a box ("Every window of the app  ⌃⌥⌘G"); keys nil = menu only.
 public struct ChipVM: Equatable {
     public let label: String
     public let keys: String?
     public let level: Finding.Level?
     public let text: String?
+
+    public init(label: String, keys: String?, level: Finding.Level?, text: String?) {
+        self.label = label; self.keys = keys; self.level = level; self.text = text
+    }
 }
 
 /// One row of the Customize Shortcuts window.
@@ -47,14 +51,14 @@ public func settingsVM(config: ShortcutConfig, sources: ClashSources,
         let f = found[base.id]?.first
         return RowVM(entry: .action(a), name: a.rawValue, section: a.isCorner ? "Corners" : "This window",
                      keys: base.formatted, level: f?.level, text: f?.text, isDefault: base.id == defaults.actions[a]!.id,
-                     chips: [chip(.action(a), .app, "whole app"), chip(.action(a), .window, next: true, "next screen"),
-                             chip(.action(a), .app, next: true, "both")])
+                     chips: [chip(.action(a), .app, "Every window of the app"), chip(.action(a), .window, next: true, "On the next screen"),
+                             chip(.action(a), .app, next: true, "Both")])
     }
     let mf = found[config.menu.id]?.first
     let menu = RowVM(entry: .menu, name: "Open the menu under the mouse", section: "Menu", keys: config.menu.formatted,
                      level: mf?.level, text: mf?.text, isDefault: config.menu.id == defaults.menu.id, chips: [])
-    let screenChips = [chip(.screen, .window, screen: 1, "this window"), chip(.screen, .app, screen: 1, "whole app"),
-                       chip(.screen, .all, screen: 1, "everything")].map { c in
+    let screenChips = [chip(.screen, .window, screen: 1, "This window"), chip(.screen, .app, screen: 1, "Every window of the app"),
+                       chip(.screen, .all, screen: 1, "Every window of every app")].map { c in
         ChipVM(label: c.label, keys: c.keys.map { $0.replacingOccurrences(of: "1", with: "n") }, level: c.level, text: c.text)
     }
     return SettingsVM(rows: rows, menu: menu, wholeApp: config.wholeApp, nextScreen: config.nextScreen,

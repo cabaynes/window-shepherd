@@ -38,7 +38,7 @@ final class SettingsLogicTests: XCTestCase {
         let vm = settingsVM(config: .defaults, sources: ClashSources(apps: [wholeAppC]), systemCheck: noSystem)
         let center = vm.rows.first { $0.entry == .action(.center) }!
         XCTAssertNil(center.level)
-        XCTAssertEqual(center.chips[0], ChipVM(label: "whole app", keys: "⌃⌥⌘C", level: .warn, text: "Xcode: Something. Yours will win."))
+        XCTAssertEqual(center.chips[0], ChipVM(label: "Every window of the app", keys: "⌃⌥⌘C", level: .warn, text: "Xcode: Something. Yours will win."))
         XCTAssertEqual(center.chips[1].keys, "⌥⌘C⇧")
         XCTAssertEqual(center.chips[2].keys, "⌃⌥⌘C⇧")
     }
@@ -47,7 +47,7 @@ final class SettingsLogicTests: XCTestCase {
         let vm = settingsVM(config: .defaults, sources: ClashSources(), systemCheck: noSystem)
         let tl = vm.rows.first { $0.entry == .action(.topLeft) }!
         XCTAssertEqual(tl.section, "Corners")
-        XCTAssertEqual(tl.chips[0], ChipVM(label: "whole app", keys: nil, level: nil, text: nil))
+        XCTAssertEqual(tl.chips[0], ChipVM(label: "Every window of the app", keys: nil, level: nil, text: nil))
         XCTAssertEqual(vm.rows.first!.section, "This window")
         XCTAssertEqual(vm.rows.count, 12)
         XCTAssertTrue(vm.rows.allSatisfy(\.isDefault))
@@ -58,7 +58,7 @@ final class SettingsLogicTests: XCTestCase {
     func testScreenChipsUseN() {
         let vm = settingsVM(config: .defaults, sources: ClashSources(), systemCheck: noSystem)
         XCTAssertEqual(vm.screenChips.map(\.keys), ["⌥⌘n", "⌃⌥⌘n", "⌃⌥⌘n⇧"])
-        XCTAssertEqual(vm.screenChips.map(\.label), ["this window", "whole app", "everything"])
+        XCTAssertEqual(vm.screenChips.map(\.label), ["This window", "Every window of the app", "Every window of every app"])
     }
 
     func testIsDefaultFlag() {
