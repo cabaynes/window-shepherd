@@ -83,10 +83,17 @@ public func validate(_ cfg: ShortcutConfig) -> [Problem] {
                                 why: "“Whole app” and “Next screen” must be different modifier keys",
                                 entries: [.wholeApp, .nextScreen]))
     }
-    if cfg.screenBase.contains(W) || cfg.screenBase.contains(N) {
+    // Said from whichever side you changed: the extra key, or the screen keys.
+    let screenKeys = cfg.screenBase.sorted().map(\.symbol).joined()
+    for (mod, entry, role) in [(W, Entry.wholeApp, "every window of the app"), (N, Entry.nextScreen, "the next screen")]
+    where cfg.screenBase.contains(mod) {
         problems.append(Problem(combo: nil, owners: ["Screens"],
-                                why: "The screen keys can't include the “whole app” or “next screen” modifier",
-                                entries: [.screenBase, .wholeApp, .nextScreen]))
+                                why: "\(mod.symbol) is one of the screen keys (\(screenKeys) plus a number), so it can't also be "
+                                   + "an extra key. To use it here, take \(mod.symbol) out of the screen keys first.",
+                                entries: [entry]))
+        problems.append(Problem(combo: nil, owners: ["Screens"],
+                                why: "\(mod.symbol) is the extra key for \(role), so it can't also be a screen key.",
+                                entries: [.screenBase]))
     }
     var byId: [String: [ShortcutBinding]] = [:]
     var order: [String] = []

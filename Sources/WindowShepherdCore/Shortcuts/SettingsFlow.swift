@@ -163,8 +163,11 @@ public final class SettingsFlow {
     public func resetAll() { propose(.defaults, nil, direct: true) }
 
     /// The whole-app or next-screen modifier.
+    /// Picking the other extra key's modifier swaps the two, in one click.
     public func setModifier(_ which: Entry, _ m: Mod) {
         var cand = target.config
+        let other: Entry = which == .wholeApp ? .nextScreen : .wholeApp
+        if cand[other] == .mod(m) { cand[other] = cand[which] }
         cand[which] = .mod(m)
         propose(cand, which)
     }
