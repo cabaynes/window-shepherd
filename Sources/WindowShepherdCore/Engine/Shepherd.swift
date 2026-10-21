@@ -136,7 +136,10 @@ public final class Shepherd {
             runSnap(pid) { [weak self] in
                 let moved: UInt32?? = await AXWorker.detached {
                     let wins = (try? system.appWindows(pid: pid)) ?? []
-                    guard let target = wins.first(where: { $0.windowID == winId }) ?? system.focusedWindow(pid: pid),
+                    // The window with keyboard focus first: after ⌘` Chrome focuses a
+                    // window without raising it, so the list's first one is the wrong one.
+                    let focused = system.focusedWindow(pid: pid).flatMap { f in wins.first { $0.windowID == f.windowID } }
+                    guard let target = focused ?? wins.first(where: { $0.windowID == winId }) ?? system.focusedWindow(pid: pid),
                           let frame = target.frame() ?? cgFrame,
                           let r = placer.frame(for: frame, screens: screens, main: main),
                           (try? target.setFrame(r)) != nil else { return nil }
@@ -209,7 +212,10 @@ public final class Shepherd {
         guard let sel = frontSel(wholeApp: wholeApp) else { return }
         var target = TargetScreen.own
         var label = a.rawValue
-        if nextScreen {
+        if nextScreen && !wholeApp {
+            target = .next
+            label = a.rawValue + " on the next screen"
+        } else if nextScreen {
             let screens = system.screens()
             let frame = system.visibleWindows().first { $0.pid == sel.pid }?.frame
             guard let here = frame.flatMap({ Geometry.screen(mostOf: $0, in: screens) }) ?? system.mainScreen() else { return }

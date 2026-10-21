@@ -28,7 +28,9 @@ extension ActionID {
 /// Which screen a placer works on: the one the window is already on, or a
 /// fixed one (by display UUID, so a screen that's gone is noticed).
 public enum TargetScreen: Equatable {
-    case own, fixed(uuid: String)
+    /// `next`: the screen after the one the window is on, worked out from the
+    /// window itself (the one with keyboard focus may not be the first listed).
+    case own, next, fixed(uuid: String)
 }
 
 public enum Placer: Equatable {
@@ -55,6 +57,7 @@ public enum Placer: Equatable {
         func resolve(_ t: TargetScreen) -> ScreenInfo? {
             switch t {
             case .own: return Geometry.screen(mostOf: window, in: screens) ?? main
+            case .next: return (Geometry.screen(mostOf: window, in: screens) ?? main).map { Screens.next(after: $0, in: screens) }
             case .fixed(let uuid): return screens.first { $0.uuid == uuid }
             }
         }

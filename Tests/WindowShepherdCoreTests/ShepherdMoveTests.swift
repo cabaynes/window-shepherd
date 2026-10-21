@@ -80,6 +80,40 @@ final class ShepherdMoveTests: XCTestCase {
         XCTAssertTrue(dell.frame.contains(sys.frameOf(3)!))
     }
 
+    // Chrome after ⌘`: the window you switched to has keyboard focus but isn't
+    // raised, so the window list still has the laptop window first (live, 2026-10-20).
+    func testMovesTheWindowWithKeyboardFocusNotTheFirstListed() async {
+        sys.addApp(10, "Chrome", windows: [(1, rect(100)), (2, rect(1200))])
+        sys.focused[10] = 2
+        sys.front = 10
+        let s = make()
+        s.doAction(.almost, wholeApp: false, nextScreen: false)
+        await waitUntil { self.sys.setCount(2) == 1 }
+        XCTAssertEqual(sys.frameOf(2), Geometry.place(UnitRect(x: 0.05, y: 0.05, w: 0.9, h: 0.9), in: dell.frame))
+        XCTAssertEqual(sys.setCount(1), 0)
+    }
+
+    func testNextScreenIsTheOneAfterTheFocusedWindowsScreen() async {
+        sys.addApp(10, "Chrome", windows: [(1, rect(100)), (2, rect(1200))])
+        sys.focused[10] = 2     // on the Dell, so "next" is the laptop
+        sys.front = 10
+        let s = make()
+        s.doAction(.almost, wholeApp: false, nextScreen: true)
+        await waitUntil { self.sys.setCount(2) == 1 }
+        XCTAssertEqual(sys.frameOf(2), Geometry.place(UnitRect(x: 0.05, y: 0.05, w: 0.9, h: 0.9), in: lap.frame))
+        XCTAssertEqual(sys.setCount(1), 0)
+    }
+
+    func testNumberedScreenMovesTheFocusedWindow() async {
+        sys.addApp(10, "Chrome", windows: [(1, rect(100)), (2, rect(1200))])
+        sys.focused[10] = 2
+        sys.front = 10
+        let s = make()
+        s.toNumberedScreen(1, scope: .window)
+        await waitUntil { self.sys.setCount(2) == 1 }
+        XCTAssertEqual(sys.setCount(1), 0)
+    }
+
     func testNextScreenUsesFrontWindowsScreen() async {
         sys.addApp(10, "Safari", windows: [(1, rect(100))])
         sys.front = 10

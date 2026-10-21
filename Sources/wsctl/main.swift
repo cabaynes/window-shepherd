@@ -10,7 +10,7 @@ let args = Array(CommandLine.arguments.dropFirst())
 func fmt(_ r: CGRect) -> String { String(format: "%.0f %.0f %.0f %.0f", r.minX, r.minY, r.width, r.height) }
 
 func usage() -> Never {
-    print("usage: wsctl screens | windows | move <id> <x> <y> <w> <h> | scan | check <id|title> <n|own> <x y w h|center|default>")
+    print("usage: wsctl screens | windows | front [seconds] | move <id> <x> <y> <w> <h> | scan | check <id|title> <n|own> <x y w h|center|default>")
     exit(2)
 }
 
@@ -27,6 +27,18 @@ case "screens":
 case "windows":
     for w in system.visibleWindows() {
         print("\(w.id)\t\(w.pid)\t\(w.app)\t\(w.title ?? "")\t\(fmt(w.frame))")
+    }
+case "front":   // after a pause, so you can switch to the app first
+    Thread.sleep(forTimeInterval: Double(args.dropFirst().first ?? "") ?? 5)
+    guard let pid = system.frontmostPID() else { print("no front app"); exit(1) }
+    let app = system.appName(pid: pid) ?? "?"
+    let mine = system.visibleWindows().filter { $0.pid == pid }
+    print("front app: \(app)")
+    for (i, w) in mine.enumerated() { print("  on-screen order \(i + 1): window \(w.id)  \(fmt(w.frame))") }
+    if let f = system.focusedWindow(pid: pid) {
+        print("  keyboard focus (needs Accessibility): window \(f.windowID.map(String.init) ?? "?")  \(f.frame().map(fmt) ?? "?")")
+    } else {
+        print("  keyboard focus: not readable (give this terminal Accessibility)")
     }
 case "move":
     guard args.count == 6, let id = UInt32(args[1]), let x = Double(args[2]), let y = Double(args[3]),
