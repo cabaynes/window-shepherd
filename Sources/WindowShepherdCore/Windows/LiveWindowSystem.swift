@@ -30,6 +30,18 @@ final class AXWindow: WindowHandle {
     /// See `applyFrame`. Only a failed move counts as failure; fixed-size
     /// windows refuse sizes.
     func setFrame(_ r: CGRect) throws {
+        // An app with "enhanced user interface" on (switched on by dictation
+        // and assistive tools) animates every move and drops a position set
+        // mid-animation: Chrome kept the new size but not the new screen
+        // (live, 2026-10-20). Off for the move, back on after, as Rectangle does.
+        var pid: pid_t = 0
+        AXUIElementGetPid(element, &pid)
+        let app = LiveWindowSystem.appElement(pid)
+        let enhanced = "AXEnhancedUserInterface" as CFString
+        var ref: CFTypeRef?
+        let wasOn = AXUIElementCopyAttributeValue(app, enhanced, &ref) == .success && (ref as? Bool) == true
+        if wasOn { AXUIElementSetAttributeValue(app, enhanced, kCFBooleanFalse) }
+        defer { if wasOn { AXUIElementSetAttributeValue(app, enhanced, kCFBooleanTrue) } }
         var err = AXError.success
         let moved = applyFrame(r,
                        setSize: { set(kAXSizeAttribute, $0) },
