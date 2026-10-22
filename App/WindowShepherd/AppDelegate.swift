@@ -32,7 +32,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             needsAccess: { [weak self] in !(self?.permission.isTrusted ?? true) },
             perform: { [weak self] in self?.perform($0) }))
         binder = HotkeyBinder(shepherd: shepherd, store: ShortcutStore()) { [weak self] in
-            DispatchQueue.main.async { MainActor.assumeIsolated { self?.statusMenu.popUpAtMouse() } }
+            // Not DispatchQueue.main: popUp blocks until the menu closes, and inside a
+            // main-queue block no other main-queue work (row clicks, finished moves) runs.
+            RunLoop.main.perform { MainActor.assumeIsolated { self?.statusMenu.popUpAtMouse() } }
         }
         shepherd.onAlert = { HUD.show($0) }
         shepherd.onBusyChanged = { [weak self] in self?.statusMenu.setBusy($0) }

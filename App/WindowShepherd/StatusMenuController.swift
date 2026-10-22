@@ -116,7 +116,8 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
     }
 
     private func mouseUp() {
-        guard let row = menu.highlightedItem, let sub = row.submenu, let box = row.representedObject as? ActionBox,
+        guard clickTap != nil,   // the menu already closed: its highlight is stale
+              let row = menu.highlightedItem, let sub = row.submenu, let box = row.representedObject as? ActionBox,
               sub.highlightedItem == nil else { return }   // on a submenu row: that row's own click runs it
         // Over the submenu (a separator, its edge)? Only a click on the main menu counts.
         if let here = menuWindow(at: NSEvent.mouseLocation), let main = mainMenuWindow, here !== main { return }
