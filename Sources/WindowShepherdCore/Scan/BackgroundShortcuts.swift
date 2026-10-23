@@ -77,10 +77,14 @@ public enum BackgroundShortcuts {
         }
         for (action, value) in prefs {
             guard let dict = value as? [String: Any] else { continue }
-            if dict.isEmpty { keys[action] = nil; continue }
+            // The user's own entry replaces the default even when it can't be read:
+            // then we just don't know the key, rather than wrongly keep the old one.
             guard let code = (dict["keyCode"] as? NSNumber)?.uint16Value,
                   let flags = (dict["modifierFlags"] as? NSNumber)?.intValue,
-                  let combo = Conflicts.fromSymbolic(keyName: KeyCodes.name(for: code), flags: flags) else { continue }
+                  let combo = Conflicts.fromSymbolic(keyName: KeyCodes.name(for: code), flags: flags) else {
+                keys[action] = nil
+                continue
+            }
             keys[action] = combo
         }
         return keys.sorted { $0.key < $1.key }.map {

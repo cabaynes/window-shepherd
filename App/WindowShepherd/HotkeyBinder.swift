@@ -37,6 +37,12 @@ final class HotkeyBinder {
         bindings = derive(config)
         Log.info("window shortcuts on")
         let ws = NSWorkspace.shared.notificationCenter
+        // Carbon gives a key to whoever registers it first: step aside before
+        // Rectangle registers its keys, or they'd work in neither app.
+        ws.addObserver(forName: NSWorkspace.willLaunchApplicationNotification, object: nil, queue: .main) { [weak self] n in
+            guard Self.bundleID(n) == Self.rectangleID else { return }
+            MainActor.assumeIsolated { self?.syncRectangle(launching: true) }
+        }
         for name in [NSWorkspace.didLaunchApplicationNotification, NSWorkspace.didTerminateApplicationNotification] {
             ws.addObserver(forName: name, object: nil, queue: .main) { [weak self] n in
                 guard Self.bundleID(n) == Self.rectangleID else { return }
@@ -58,6 +64,7 @@ final class HotkeyBinder {
         menuKey = nil
         config = cfg
         bindings = derive(cfg)
+        rectangleKeys = currentRectangleKeys()   // never grab a key Rectangle holds, even briefly
         if active {
             for b in bindings {
                 switch b.owner {
@@ -119,9 +126,9 @@ final class HotkeyBinder {
 
     /// Also run every 2 s as a backstop. Cheap: the running-apps list, plus
     /// Rectangle's saved preferences only while it runs.
-    func syncRectangle() {
-        let running = shepherd.system.isRunning(bundleID: Self.rectangleID)
-        let keys: Set<String> = running ? Set(BackgroundShortcuts.rectangleLive().map(\.combo.id)) : []
+    /// `launching`: Rectangle is starting and not listed as running yet.
+    func syncRectangle(launching: Bool = false) {
+        let keys = currentRectangleKeys(launching: launching)
         if keys != rectangleKeys {
             rectangleKeys = keys
             enableAsDecided()
@@ -133,6 +140,11 @@ final class HotkeyBinder {
         Log.info(shared.isEmpty ? "window shortcuts on"
                  : "Rectangle is running: \(shared.count) shared shortcuts off (\(shared.map(\.formatted).joined(separator: " ")))")
         onRectangleSharedChanged?(shared)
+    }
+
+    private func currentRectangleKeys(launching: Bool = false) -> Set<String> {
+        guard launching || shepherd.system.isRunning(bundleID: Self.rectangleID) else { return [] }
+        return Set(BackgroundShortcuts.rectangleLive().map(\.combo.id))
     }
 
     /// The formatted shortcut for a binding (⌃⌥⌘ key ⇧), or nil if none is bound.

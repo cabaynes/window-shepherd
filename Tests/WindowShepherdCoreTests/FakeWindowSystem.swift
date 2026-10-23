@@ -10,7 +10,7 @@ final class FakeWindowSystem: WindowSystem {
         let id: UInt32
         unowned let sys: FakeWindowSystem
         init(_ id: UInt32, _ sys: FakeWindowSystem) { self.id = id; self.sys = sys }
-        var windowID: UInt32? { id }
+        var windowID: UInt32? { sys.locked { sys.unreadableIDs.contains(id) } ? nil : id }
         func frame() -> CGRect? { sys.locked { sys.windowsByID[id]?.frame } }
         func setFrame(_ r: CGRect) throws {
             let delay = sys.locked { sys.setDelay[id] ?? 0 }
@@ -38,6 +38,7 @@ final class FakeWindowSystem: WindowSystem {
     var listBehaviour: [pid_t: ListBehaviour] = [:]
     var hiddenFromAX: Set<UInt32> = []           // in the CG list but not in the app's AX list (sheets)
     var focused: [pid_t: UInt32] = [:]
+    var unreadableIDs: Set<UInt32> = []          // _AXUIElementGetWindow fails for these
     var setDelay: [UInt32: TimeInterval] = [:]
     var failSet: Set<UInt32> = []                // setFrame throws for these
     var framesSet: [(UInt32, CGRect)] = []

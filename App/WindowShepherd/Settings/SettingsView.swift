@@ -52,7 +52,7 @@ struct SettingsView: View {
         VStack(alignment: .leading, spacing: 0) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
-                    let yielded = rectangleCount(vm)
+                    let yielded = rectangleCount(vm, screens: model.screens.count)
                     if yielded > 0 {
                         Text("Rectangle is running and has priority on \(yielded == 1 ? "1 of your shortcuts" : "\(yielded) of your shortcuts"), "
                              + "marked in purple below. Everything else works.")
@@ -259,21 +259,29 @@ struct SettingsView: View {
                 message("Checking your open apps… \(p.keys ?? "") will be set when that's done (keep this window open).", level: .warn)
             } else {
                 // Judge writes each as "⌘C — Safari: Copy. Yours will win."
-                clashBox(p.warns.map { w in
+                clashBoxes(p.warns.map { w in
                     let parts = w.components(separatedBy: " — ")
-                    return Clash(keys: parts.count > 1 ? parts[0] : "", text: parts.dropFirst().joined(separator: " — "), level: .warn)
+                    let text = parts.dropFirst().joined(separator: " — ")
+                    return Clash(keys: parts.count > 1 ? parts[0] : "", text: text,
+                                 level: text.hasSuffix(Self.yieldSuffix) ? .yield : .warn)
                 })
             }
         } else if !clashes.isEmpty {
-            // Rectangle's keys get their own purple box, so they're easy to spot.
-            let yields = clashes.filter { $0.level == .yield }, others = clashes.filter { $0.level != .yield }
-            VStack(alignment: .leading, spacing: 6) {
-                if !yields.isEmpty {
-                    clashBox(yields, title: "Rectangle has priority while it's running",
-                             suffix: " Rectangle has priority while it's running.", color: Palette.purple, bg: Palette.purpleBG)
-                }
-                if !others.isEmpty { clashBox(others) }
+            clashBoxes(clashes)
+        }
+    }
+
+    private static let yieldSuffix = " Rectangle has priority while it's running."
+
+    /// Rectangle's keys get their own purple box, so they're easy to spot.
+    private func clashBoxes(_ clashes: [Clash]) -> some View {
+        let yields = clashes.filter { $0.level == .yield }, others = clashes.filter { $0.level != .yield }
+        return VStack(alignment: .leading, spacing: 6) {
+            if !yields.isEmpty {
+                clashBox(yields, title: "Rectangle has priority while it's running",
+                         suffix: Self.yieldSuffix, color: Palette.purple, bg: Palette.purpleBG)
             }
+            if !others.isEmpty { clashBox(others) }
         }
     }
 
@@ -314,10 +322,12 @@ struct SettingsView: View {
     }
 
     /// How many of your shortcuts Rectangle has priority on right now.
-    private func rectangleCount(_ vm: SettingsVM) -> Int {
+    /// Screen keys count only for the screens shown (as in the Send to a screen grid).
+    private func rectangleCount(_ vm: SettingsVM, screens: Int) -> Int {
         let rows = vm.rows + [vm.menu]
         let rowKeys = rows.filter { $0.level == .yield }.map(\.keys)
-        let chipKeys = (rows.flatMap(\.chips) + vm.screenKeys.flatMap { $0 }).filter { $0.level == .yield }.compactMap(\.keys)
+        let shownScreens = vm.screenKeys.prefix(max(2, min(screens, vm.screenKeys.count)))
+        let chipKeys = (rows.flatMap(\.chips) + shownScreens.flatMap { $0 }).filter { $0.level == .yield }.compactMap(\.keys)
         return Set(rowKeys + chipKeys).count
     }
 

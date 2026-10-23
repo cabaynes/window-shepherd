@@ -138,8 +138,10 @@ public final class Shepherd {
                     let wins = (try? system.appWindows(pid: pid)) ?? []
                     // The window with keyboard focus first: after ⌘` Chrome focuses a
                     // window without raising it, so the list's first one is the wrong one.
-                    let focused = system.focusedWindow(pid: pid).flatMap { f in wins.first { $0.windowID == f.windowID } }
-                    guard let target = focused ?? wins.first(where: { $0.windowID == winId }) ?? system.focusedWindow(pid: pid),
+                    // Asked once; matched only on a real id (two unreadable ids aren't the same window).
+                    let f = system.focusedWindow(pid: pid)
+                    let focused = f.flatMap { $0.windowID }.flatMap { id in wins.first { $0.windowID == id } }
+                    guard let target = focused ?? wins.first(where: { $0.windowID == winId }) ?? f,
                           let frame = target.frame() ?? cgFrame,
                           let r = placer.frame(for: frame, screens: screens, main: main),
                           (try? target.setFrame(r)) != nil else { return nil }

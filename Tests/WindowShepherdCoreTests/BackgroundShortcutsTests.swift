@@ -40,6 +40,13 @@ final class BackgroundShortcutsTests: XCTestCase {
         XCTAssertNil(keys(list)["Next display"])
     }
 
+    func testUnreadableRectangleKeyDropsTheDefault() {
+        let list = BackgroundShortcuts.rectangle(prefs: ["alternateDefaultShortcuts": true,
+                                                         "nextDisplay": ["keyCode": "junk", "modifierFlags": 1572864]])
+        XCTAssertNil(keys(list)["Next display"])
+        XCTAssertFalse(list.contains { $0.combo.formatted == "⌃⌥⌘→" })
+    }
+
     func testDriveDecodes() {
         XCTAssertEqual(BackgroundShortcuts.googleDrive(searchHotKey: 592705486853)?.combo.formatted, "⌥⌘G⇧")
         XCTAssertEqual(BackgroundShortcuts.googleDrive(searchHotKey: 592705486850)?.combo.formatted, "⌥⌘D⇧")

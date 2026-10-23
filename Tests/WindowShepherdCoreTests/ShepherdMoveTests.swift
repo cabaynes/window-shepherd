@@ -93,6 +93,19 @@ final class ShepherdMoveTests: XCTestCase {
         XCTAssertEqual(sys.setCount(1), 0)
     }
 
+    // Two windows whose ids can't be read aren't the same window: use the focused one.
+    func testUnreadableWindowIDsDontMatchEachOther() async {
+        sys.addApp(10, "Chrome", windows: [(1, rect(100)), (2, rect(1200))])
+        sys.unreadableIDs = [1, 2]
+        sys.focused[10] = 2
+        sys.front = 10
+        let s = make()
+        s.doAction(.almost, wholeApp: false, nextScreen: false)
+        await waitUntil { self.sys.setCount(2) == 1 }
+        XCTAssertEqual(sys.setCount(2), 1)
+        XCTAssertEqual(sys.setCount(1), 0)
+    }
+
     func testNextScreenIsTheOneAfterTheFocusedWindowsScreen() async {
         sys.addApp(10, "Chrome", windows: [(1, rect(100)), (2, rect(1200))])
         sys.focused[10] = 2     // on the Dell, so "next" is the laptop

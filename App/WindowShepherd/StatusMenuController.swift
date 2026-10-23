@@ -21,6 +21,8 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
     private let menu = NSMenu()
     private let hooks: MenuHooks
     private var busyShown: Bool?
+    /// Just built by popUpAtMouse to measure it: the delegate needn't build it again.
+    private var builtForPopUp = false
 
     init(hooks: MenuHooks) {
         self.hooks = hooks
@@ -51,6 +53,7 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
     func popUpAtMouse() {
         let mouse = NSEvent.mouseLocation
         menuNeedsUpdate(menu)   // build it now, so it can be measured
+        builtForPopUp = true
         var at = mouse          // the menu's top-left corner
         if let vf = NSScreen.screens.first(where: { NSMouseInRect(mouse, $0.frame, false) })?.visibleFrame {
             let size = menu.size
@@ -58,12 +61,14 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
             if at.x + size.width > vf.maxX { at.x = max(vf.minX, vf.maxX - size.width) }
         }
         menu.popUp(positioning: nil, at: at, in: nil)
+        builtForPopUp = false   // popUp returns once the menu has closed
     }
 
     // MARK: NSMenuDelegate
 
     func menuNeedsUpdate(_ menu: NSMenu) {
         guard menu === self.menu else { return }
+        if builtForPopUp { builtForPopUp = false; return }
         let s = hooks.shepherd
         let binder = hooks.binder()
         let cfg = binder?.config ?? .defaults

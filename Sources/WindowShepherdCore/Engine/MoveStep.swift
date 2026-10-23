@@ -25,14 +25,16 @@ public final class Tally<V> {
 
 public struct MoveTiming {
     /// One window taking longer than this to move: stop on that app for this try.
-    /// (Safari normally takes 0.3–0.4 s per window while it re-lays out pages.)
-    public var windowLimit: TimeInterval = 0.8
+    /// (Safari normally takes 0.3–0.4 s per window while it re-lays out pages,
+    /// and a move is now up to ~10 calls with the enhanced-UI switch: at 0.8 s,
+    /// answering VS Code, Chrome and Transmission windows were skipped, 0.83–1.10 s.)
+    public var windowLimit: TimeInterval = 1.5
     /// Listing windows: empty after this long means the 0.5 s timeout was hit.
     public var listSlow: TimeInterval = 0.4
     /// Seconds before the 2nd and 3rd try of an app that didn't answer.
     public var retryWaits: [TimeInterval] = [2, 4]
 
-    public init(windowLimit: TimeInterval = 0.8, listSlow: TimeInterval = 0.4, retryWaits: [TimeInterval] = [2, 4]) {
+    public init(windowLimit: TimeInterval = 1.5, listSlow: TimeInterval = 0.4, retryWaits: [TimeInterval] = [2, 4]) {
         self.windowLimit = windowLimit; self.listSlow = listSlow; self.retryWaits = retryWaits
     }
 
