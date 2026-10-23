@@ -21,7 +21,7 @@ osascript -e 'application id "com.windowshepherd.WindowShepherd" is running' | g
   || { echo "Window Shepherd isn't running — open it first."; exit 1; }
 # pgrep, not `application id … is running`: that fails to compile when Rectangle isn't installed
 pgrep -xq Rectangle \
-  && { echo "Rectangle is running, so Window Shepherd's window keys are off. Quit Rectangle first."; exit 1; }
+  && { echo "Rectangle is running and holds some of the keys this test presses. Quit Rectangle first."; exit 1; }
 
 rm -f /tmp/ws-e2e-testwindows.out   # never read a previous run's window ids
 .build/debug/TestWindows 3 --title-prefix WSTEST >/tmp/ws-e2e-testwindows.out 2>&1 &

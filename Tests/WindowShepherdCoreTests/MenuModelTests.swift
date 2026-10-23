@@ -81,6 +81,18 @@ final class MenuModelTests: XCTestCase {
                                      "Move to DELL (2) — Full screen", "Move to DELL (2) — 90%", "Move to DELL (2) — same size"])
     }
 
+    func testRectangleRow() {
+        func build(_ n: Int) -> [MenuNode] { var i = inputs(); i.rectangleShared = n; return MenuModel.build(i) }
+        let t = titles(build(2))
+        let row = t.firstIndex(of: "Rectangle is using 2 of your shortcuts…")
+        XCTAssertNotNil(row)
+        XCTAssertEqual(t[row! + 1], "Customize shortcuts…")
+        guard case let .item(_, _, action, _) = build(2)[row!] else { return XCTFail("an item") }
+        XCTAssertEqual(action, .customize)
+        XCTAssertTrue(titles(build(1)).contains("Rectangle is using 1 of your shortcuts…"))
+        XCTAssertFalse(titles(build(0)).contains { $0.hasPrefix("Rectangle") })
+    }
+
     func testMoveToKeys() {
         let menu = MenuModel.build(inputs())
         XCTAssertEqual(submenu(menu, "Move to DELL (2) — 90%")?.keys, "⌥⌘2")

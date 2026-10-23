@@ -56,7 +56,7 @@ More keys means more windows. Every shortcut can be changed in **⧉ → Customi
 
 ## Different from Rectangle, not better
 
-[Rectangle](https://github.com/rxhanson/Rectangle) is excellent and free, and Window Shepherd's single-window keys deliberately match its defaults. If you use Rectangle, Window Shepherd switches its own window keys off while Rectangle is running, and back on when it quits. Rectangle snaps one window at a time. Window Shepherd is built around different moments: the unplug, the replug, and "move all of these over there".
+[Rectangle](https://github.com/rxhanson/Rectangle) is excellent and free, and Window Shepherd's single-window keys deliberately match its defaults. If you use Rectangle too, the two share only a few keys (two with Rectangle's recommended set). While Rectangle runs, Window Shepherd steps aside on exactly those, tells you once which ones, and takes them back when Rectangle quits. Rectangle snaps one window at a time. Window Shepherd is built around different moments: the unplug, the replug, and "move all of these over there".
 
 Apps that restore layouts already exist and are good: [Stay](https://cordlessdog.com/stay), [Moom](https://manytricks.com/moom/), [Display Maid](https://apps.apple.com/us/app/display-maid/id450063525?mt=12) and [Rectangle Pro](https://rectangleapp.com/pro). Most ask you to save a layout first. Window Shepherd remembers continuously, so there's nothing to set up. It's free and open source.
 

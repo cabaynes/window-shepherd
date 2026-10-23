@@ -20,18 +20,20 @@ public enum BackgroundShortcuts {
 
     /// Rectangle's shortcuts while it runs, then Google Drive's search key.
     public static func live(rectangleRunning: Bool) -> [BackgroundShortcut] {
-        var list: [BackgroundShortcut] = []
-        if rectangleRunning,
-           let prefs = CFPreferencesCopyMultiple(nil, rectangleID as CFString, kCFPreferencesCurrentUser,
-                                                 kCFPreferencesAnyHost) as? [String: Any] {
-            list += rectangle(prefs: prefs)
-        }
+        var list = rectangleRunning ? rectangleLive() : []
         let drive = CFPreferencesCopyAppValue("SearchHotKey" as CFString, driveSettingsID as CFString) as? NSNumber
         if let d = googleDrive(searchHotKey: drive?.int64Value) { list.append(d) }
         return list
     }
 
     // MARK: Rectangle
+
+    /// Rectangle's shortcuts from its saved preferences (whether or not it runs).
+    public static func rectangleLive() -> [BackgroundShortcut] {
+        let prefs = CFPreferencesCopyMultiple(nil, rectangleID as CFString, kCFPreferencesCurrentUser,
+                                              kCFPreferencesAnyHost) as? [String: Any]
+        return rectangle(prefs: prefs ?? [:])
+    }
 
     private typealias Default = (action: String, code: UInt16, mods: Set<Mod>)
 

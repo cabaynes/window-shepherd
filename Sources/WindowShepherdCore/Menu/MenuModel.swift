@@ -30,6 +30,8 @@ public struct MenuInputs {
     public var launchAtLogin: Bool
     public var needsAccess = false
     public var retryAt: Date?
+    /// How many of Window Shepherd's shortcuts Rectangle holds right now.
+    public var rectangleShared = 0
 
     public init(ctx: MenuContext, screens: [ScreenInfo], bindings: [ShortcutBinding], config: ShortcutConfig,
                 retry: (count: Int, titles: [String])?, launchAtLogin: Bool, needsAccess: Bool = false, retryAt: Date? = nil) {
@@ -111,6 +113,9 @@ public enum MenuModel {
                 }
             }
             menu.append(.separator)
+        }
+        if i.rectangleShared > 0 {
+            menu.append(.item(title: "Rectangle is using \(i.rectangleShared) of your shortcuts…", keys: nil, action: .customize))
         }
         menu.append(.item(title: "Customize shortcuts…", keys: nil, action: .customize))
         menu.append(.submenu(title: "Keyboard shortcuts", keys: nil, children: shortcutReference(i.config, i.bindings)))

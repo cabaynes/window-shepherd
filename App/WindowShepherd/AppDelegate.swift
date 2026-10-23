@@ -38,6 +38,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         shepherd.onAlert = { HUD.show($0) }
         shepherd.onBusyChanged = { [weak self] in self?.statusMenu.setBusy($0) }
+        binder.onRectangleSharedChanged = { [weak self] in self?.rectangleNotice($0) }
 
         permission.onChange = { [weak self] trusted in self?.permissionChanged(trusted) }
         if permission.isTrusted {
@@ -156,6 +157,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     // MARK: Menu actions
+
+    /// Says once which shortcuts Rectangle gets while it runs; again only if that set changes.
+    private func rectangleNotice(_ shared: [Combo]) {
+        guard !shared.isEmpty else { return }
+        let ids = shared.map(\.id).sorted().joined(separator: " ")
+        guard UserDefaults.standard.string(forKey: "rectangleNoticed") != ids else { return }
+        UserDefaults.standard.set(ids, forKey: "rectangleNoticed")
+        let keys = shared.map(\.formatted).joined(separator: " ")
+        let n = shared.count == 1 ? "1 of the same shortcuts" : "\(shared.count) of the same shortcuts"
+        // Not DispatchQueue.main: runModal would hold up every other main-queue job.
+        RunLoop.main.perform { [weak self] in
+            MainActor.assumeIsolated {
+                let alert = NSAlert()
+                alert.messageText = "Rectangle is running and uses \(n): \(keys)"
+                alert.informativeText = "Rectangle gets those while it runs; everything else works. To use Window "
+                    + "Shepherd's, quit Rectangle and turn off \u{201C}Launch on login\u{201D} in its settings, or uninstall it."
+                alert.addButton(withTitle: "OK")
+                alert.addButton(withTitle: "Show shortcuts")
+                NSApp.activate()
+                if alert.runModal() == .alertSecondButtonReturn { self?.perform(.customize) }
+            }
+        }
+    }
 
     private func perform(_ action: MenuAction) {
         switch action {

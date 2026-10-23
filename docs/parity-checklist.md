@@ -70,7 +70,7 @@ Legend: **A** = `scripts/e2e.sh` checks it automatically · **M** = check by han
 
 ## Coexistence
 
-- [ ] **M** Action keys switch off while Rectangle runs, and back on when it quits
+- [ ] **M** While Rectangle runs, only the keys it shares switch off (with a one-time notice and a ⧉ menu row); they come back when it quits. Changed from "all action keys off" 2026-10-23, Charles's call
 - [x] **M** The Hammerspoon mover pauses while Window Shepherd runs, and comes back when it quits (verified 2026-10-19 by Claude: pause/resume logged, ⧉ icon hidden and restored, 51 hotkeys live after resume)
 
 ## New for strangers

@@ -4,11 +4,11 @@ import WindowShepherdCore
 /// Binds every Window Shepherd shortcut from the config. ⌥⌘ + key = this
 /// window; add ⌃ = every window of the front app; add ⇧ = on the next
 /// screen. Screen keys are bound only for screens that exist (and only with
-/// 2+), so apps keep the other numbers. Action keys switch off while
-/// Rectangle runs; number keys and the menu key stay on.
+/// 2+), so apps keep the other numbers. While Rectangle runs, only the keys
+/// it also uses switch off; everything else stays on.
 @MainActor
 final class HotkeyBinder {
-    nonisolated static let rectangleID = "com.knollsoft.Rectangle"
+    nonisolated static let rectangleID = BackgroundShortcuts.rectangleID
 
     private let shepherd: Shepherd
     private let store: ShortcutStore
@@ -21,7 +21,11 @@ final class HotkeyBinder {
     private var menuKey: Hotkey?
     private var numberKeyCount = -1
     private(set) var suspended = false
-    private(set) var windowKeysOn: Bool
+    /// The bound shortcuts Rectangle also uses, while it runs (Rectangle gets them).
+    private(set) var rectangleShared: [Combo] = []
+    /// Every key Rectangle uses while it runs (bound by us or not), by Combo.id.
+    private var rectangleKeys: Set<String> = []
+    var onRectangleSharedChanged: (([Combo]) -> Void)?
     /// False while Accessibility is missing: nothing is registered.
     var active = false { didSet { if active != oldValue { apply(config, save: false) } } }
 
@@ -31,18 +35,13 @@ final class HotkeyBinder {
         self.openMenuAtMouse = openMenuAtMouse
         config = store.load()
         bindings = derive(config)
-        windowKeysOn = !shepherd.system.isRunning(bundleID: Self.rectangleID)
-        Log.info(windowKeysOn ? "window shortcuts on" : "Rectangle is running: window shortcuts off")
+        Log.info("window shortcuts on")
         let ws = NSWorkspace.shared.notificationCenter
-        for name in [NSWorkspace.willLaunchApplicationNotification, NSWorkspace.didLaunchApplicationNotification] {
+        for name in [NSWorkspace.didLaunchApplicationNotification, NSWorkspace.didTerminateApplicationNotification] {
             ws.addObserver(forName: name, object: nil, queue: .main) { [weak self] n in
                 guard Self.bundleID(n) == Self.rectangleID else { return }
-                MainActor.assumeIsolated { self?.setWindowKeys(false) }   // before Rectangle claims its keys
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { MainActor.assumeIsolated { self?.syncRectangle() } }
             }
-        }
-        ws.addObserver(forName: NSWorkspace.didTerminateApplicationNotification, object: nil, queue: .main) { [weak self] n in
-            guard Self.bundleID(n) == Self.rectangleID else { return }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { MainActor.assumeIsolated { self?.syncRectangle() } }
         }
     }
 
@@ -64,13 +63,13 @@ final class HotkeyBinder {
                 switch b.owner {
                 case .menu:
                     menuKey = HotkeyCenter.shared.register(b.combo) { [weak self] in self?.openMenuAtMouse() }
-                    if !suspended { menuKey?.enable() }
+                    if let m = menuKey, shouldEnable(m) { m.enable() }
                 case .action(let a):
                     let wholeApp = b.scope == .app, next = b.nextScreen
                     guard let hk = HotkeyCenter.shared.register(b.combo, { [weak self] in
                         self?.shepherd.doAction(a, wholeApp: wholeApp, nextScreen: next)
                     }) else { continue }
-                    if windowKeysOn && !suspended { hk.enable() }
+                    if shouldEnable(hk) { hk.enable() }
                     windowKeys.append(hk)
                 case .screen:
                     break
@@ -78,6 +77,7 @@ final class HotkeyBinder {
             }
         }
         syncNumberKeys(force: true)
+        syncRectangle()
         if save { store.save(cfg) }
     }
 
@@ -97,7 +97,7 @@ final class HotkeyBinder {
             guard let hk = HotkeyCenter.shared.register(b.combo, { [weak self] in
                 self?.shepherd.toNumberedScreen(screen, scope: scope)
             }) else { continue }
-            if !suspended { hk.enable() }
+            if shouldEnable(hk) { hk.enable() }
             numberKeys.append(hk)
         }
     }
@@ -105,20 +105,35 @@ final class HotkeyBinder {
     /// Recording a new shortcut: every key off, then back as it was.
     func suspend(_ on: Bool) {
         suspended = on
-        for hk in numberKeys { on ? hk.disable() : hk.enable() }
-        if let m = menuKey { on ? m.disable() : m.enable() }
-        for hk in windowKeys { (on || !windowKeysOn) ? hk.disable() : hk.enable() }
+        enableAsDecided()
     }
 
-    private func setWindowKeys(_ on: Bool) {
-        guard windowKeysOn != on else { return }
-        windowKeysOn = on
-        for hk in windowKeys { (on && !suspended) ? hk.enable() : hk.disable() }
-        Log.info(on ? "window shortcuts on" : "Rectangle is running: window shortcuts off")
+    /// The one rule for every key: on, unless recording or Rectangle has it.
+    private func shouldEnable(_ hk: Hotkey) -> Bool {
+        !suspended && !rectangleKeys.contains(hk.combo.id)
     }
 
-    /// Also run every 2 s as a backstop (cheap: the running-apps list only).
-    func syncRectangle() { setWindowKeys(!shepherd.system.isRunning(bundleID: Self.rectangleID)) }
+    private func enableAsDecided() {
+        for hk in windowKeys + numberKeys + (menuKey.map { [$0] } ?? []) { shouldEnable(hk) ? hk.enable() : hk.disable() }
+    }
+
+    /// Also run every 2 s as a backstop. Cheap: the running-apps list, plus
+    /// Rectangle's saved preferences only while it runs.
+    func syncRectangle() {
+        let running = shepherd.system.isRunning(bundleID: Self.rectangleID)
+        let keys: Set<String> = running ? Set(BackgroundShortcuts.rectangleLive().map(\.combo.id)) : []
+        if keys != rectangleKeys {
+            rectangleKeys = keys
+            enableAsDecided()
+        }
+        let bound = windowKeys + numberKeys + (menuKey.map { [$0] } ?? [])
+        let shared = bound.map(\.combo).filter { rectangleKeys.contains($0.id) }
+        guard shared.map(\.id).sorted() != rectangleShared.map(\.id).sorted() else { return }
+        rectangleShared = shared
+        Log.info(shared.isEmpty ? "window shortcuts on"
+                 : "Rectangle is running: \(shared.count) shared shortcuts off (\(shared.map(\.formatted).joined(separator: " ")))")
+        onRectangleSharedChanged?(shared)
+    }
 
     /// The formatted shortcut for a binding (⌃⌥⌘ key ⇧), or nil if none is bound.
     func keyLabel(_ owner: Owner, _ scope: Scope, next: Bool = false, screen: Int? = nil) -> String? {

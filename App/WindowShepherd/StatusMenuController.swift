@@ -67,9 +67,10 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
         let s = hooks.shepherd
         let binder = hooks.binder()
         let cfg = binder?.config ?? .defaults
-        let inputs = MenuInputs(ctx: s.menuContext(), screens: s.system.screens(), bindings: binder?.bindings ?? derive(cfg),
+        var inputs = MenuInputs(ctx: s.menuContext(), screens: s.system.screens(), bindings: binder?.bindings ?? derive(cfg),
                                 config: cfg, retry: s.retryRows(), launchAtLogin: hooks.launchAtLogin(),
                                 needsAccess: hooks.needsAccess(), retryAt: s.retryOffer?.at)
+        inputs.rectangleShared = binder?.rectangleShared.count ?? 0
         render(MenuModel.build(inputs), into: menu)
         updateTooltip()
     }
