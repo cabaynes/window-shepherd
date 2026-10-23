@@ -162,22 +162,6 @@ public final class SettingsFlow {
 
     public func resetAll() { propose(.defaults, nil, direct: true) }
 
-    /// The whole-app or next-screen modifier.
-    /// Picking the other extra key's modifier swaps the two, in one click.
-    public func setModifier(_ which: Entry, _ m: Mod) {
-        var cand = target.config
-        let other: Entry = which == .wholeApp ? .nextScreen : .wholeApp
-        if cand[other] == .mod(m) { cand[other] = cand[which] }
-        cand[which] = .mod(m)
-        propose(cand, which)
-    }
-
-    public func toggleScreenMod(_ m: Mod) {
-        var cand = target.config
-        if cand.screenBase.contains(m) { cand.screenBase.remove(m) } else { cand.screenBase.insert(m) }
-        propose(cand, .screenBase)
-    }
-
     /// The window closed: a pending Keep / Cancel is dropped, nothing half-applied.
     public func closed() {
         stopRecording()

@@ -30,7 +30,8 @@ public struct SettingsVM: Equatable {
     public let wholeApp: Mod
     public let nextScreen: Mod
     public let screenBase: Set<Mod>
-    public let screenChips: [ChipVM]
+    /// The three screen keys for each screen number: [0] is screen 1, up to 9.
+    public let screenKeys: [[ChipVM]]
 }
 
 /// What the Customize Shortcuts window shows for `config`, with every clash
@@ -57,10 +58,10 @@ public func settingsVM(config: ShortcutConfig, sources: ClashSources,
     let mf = found[config.menu.id]?.first
     let menu = RowVM(entry: .menu, name: "Open the menu under the mouse", section: "Menu", keys: config.menu.formatted,
                      level: mf?.level, text: mf?.text, isDefault: config.menu.id == defaults.menu.id, chips: [])
-    let screenChips = [chip(.screen, .window, screen: 1, "This window"), chip(.screen, .app, screen: 1, "Every window of the app"),
-                       chip(.screen, .all, screen: 1, "Every window of every app")].map { c in
-        ChipVM(label: c.label, keys: c.keys.map { $0.replacingOccurrences(of: "1", with: "n") }, level: c.level, text: c.text)
+    let screenKeys = (1...9).map { n in
+        [chip(.screen, .window, screen: n, "This window"), chip(.screen, .app, screen: n, "Every window of the app"),
+         chip(.screen, .all, screen: n, "Every window of every app")]
     }
     return SettingsVM(rows: rows, menu: menu, wholeApp: config.wholeApp, nextScreen: config.nextScreen,
-                      screenBase: config.screenBase, screenChips: screenChips)
+                      screenBase: config.screenBase, screenKeys: screenKeys)
 }

@@ -10,7 +10,7 @@ Legend: **A** = `scripts/e2e.sh` checks it automatically · **M** = check by han
 - [x] **M U** Shortcuts appear beside the action rows and the scope rows, in ⌃ ⌥ ⌘ key ⇧ order
 - [x] **M U** "Keyboard shortcuts" submenu: every shortcut, in full-strength text (not grey)
 - [x] **M U** "Move to <screen> (n) — Full screen / 90% / same size" lists only screens the front window isn't on
-- [ ] **M U** With one screen connected, the "Move to" section is hidden
+- [x] **M U** With one screen connected, the "Move to" section is hidden
 - [ ] **M U** A "Move to" chosen after its screen was unplugged says "<name> (n) isn't connected anymore"
 - [x] **M** The ⧉ turns red while a move or restore is running
 - [x] **M** ⌃⌥⌘M opens the menu under the mouse
@@ -36,19 +36,19 @@ Legend: **A** = `scripts/e2e.sh` checks it automatically · **M** = check by han
 | ⌃⌥⌘M | the menu under the mouse | M |
 
 - [ ] **M U** Number keys exist only for screens that are connected (and only with 2 or more screens)
-- [ ] **M** Single-window keyboard moves are silent; bulk moves show "Moved N windows → …"
-- [ ] **M** A whole-app move brings that app to the front; an "Everything" move doesn't change the front app
+- [x] **M** Single-window keyboard moves are silent; bulk moves show "Moved N windows → …"
+- [x] **M** A whole-app move brings that app to the front; an "Everything" move doesn't change the front app
 
 ## Auto-restore
 
-- [ ] **M U** Every window's spot is remembered per combination of connected screens
+- [x] **M U** Every window's spot is remembered per combination of connected screens
 - [ ] **U** A spot is recorded only after it's been seen twice, about 2 s apart
-- [ ] **M U** After a screen change, windows go back at +3 / +10 / +20 s
-- [ ] **M U** A window you move during those passes isn't put back
+- [x] **M U** After a screen change, windows go back at +3 / +10 / +20 s
+- [x] **M U** A window you move during those passes isn't put back
 - [ ] **U** Spots macOS dumped windows in aren't recorded as their home
 - [ ] **U** Windows unseen for 30 days are forgotten (minimized and other-Space windows are kept until then)
-- [ ] **M** Remembered spots survive quitting and reopening the app
-- [ ] **M** **One real unplug → replug of the Dell** puts every window back
+- [x] **M** Remembered spots survive quitting and reopening the app
+- [x] **M** **One real unplug → replug of the Dell** puts every window back
 
 ## Apps that don't respond
 
@@ -57,21 +57,21 @@ Legend: **A** = `scripts/e2e.sh` checks it automatically · **M** = check by han
 
 ## Customize Shortcuts window
 
-- [ ] **M** One recorder box per action; derived chips (whole app / next screen / both) beside each
-- [ ] **M** ⌃⌥⌘⇧ toggles for the two "add a key" modifiers and the screen keys
-- [ ] **M U** Red = blocked (clashes with Window Shepherd itself, or macOS would take it first)
-- [ ] **M U** Amber = used by an app; Keep or Cancel before it applies
-- [ ] **M** A change made while "Checking your open apps…" waits for the check
-- [ ] **M** Keys without ⌃/⌥/⌘ are ignored while recording ("Hold ⌃, ⌥ or ⌘ too"); Esc cancels
-- [ ] **M U** ⌘Tab and ⌘\` can't be used
-- [ ] **M** ↺ per row and Reset all
-- [ ] **M** Clicking another window stops recording
-- [ ] **M** "Buy me a coffee" link at the bottom opens buymeacoffee.com/cccccccharles
+- [x] **M** One recorder box per action; derived chips (whole app / next screen / both) beside each
+- [ ] **M** "Extra keys" and "Send to a screen" explain ⌃ / ⇧ / both and ⌥⌘ + number, with no buttons (the keys are fixed since 2026-10-23, Charles's call)
+- [x] **M U** Red = blocked (clashes with Window Shepherd itself, or macOS would take it first)
+- [x] **M U** Amber = used by an app; Keep or Cancel before it applies
+- [x] **M** A change made while "Checking your open apps…" waits for the check
+- [x] **M** Keys without ⌃/⌥/⌘ are ignored while recording ("Hold ⌃, ⌥ or ⌘ too"); Esc cancels
+- [x] **M U** ⌘Tab and ⌘\` can't be used
+- [x] **M** ↺ per row and Reset all
+- [x] **M** Clicking another window stops recording
+- [x] **M** "Buy me a coffee" link at the bottom opens buymeacoffee.com/cccccccharles
 
 ## Coexistence
 
 - [ ] **M** Action keys switch off while Rectangle runs, and back on when it quits
-- [ ] **M** The Hammerspoon mover pauses while Window Shepherd runs, and comes back when it quits (verified 2026-10-19 by Claude: pause/resume logged, ⧉ icon hidden and restored, 51 hotkeys live after resume)
+- [x] **M** The Hammerspoon mover pauses while Window Shepherd runs, and comes back when it quits (verified 2026-10-19 by Claude: pause/resume logged, ⧉ icon hidden and restored, 51 hotkeys live after resume)
 
 ## New for strangers
 

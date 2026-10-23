@@ -109,39 +109,6 @@ final class SettingsFlowTests: XCTestCase {
         XCTAssertEqual(target.config, .defaults)
     }
 
-    func testModifierToggles() {
-        flow.toggleScreenMod(.ctrl)   // ⌃ is the whole-app modifier: blocked
-        XCTAssertNotNil(flow.errors[Entry.screenBase.key])
-        XCTAssertEqual(target.config.screenBase, [.alt, .cmd])
-        flow.setModifier(.nextScreen, .alt)   // ⌥ is in the screen base: blocked
-        XCTAssertNotNil(flow.errors[Entry.nextScreen.key])
-        target.config.nextScreen = .ctrl            // swap the two "add a key" modifiers
-        flow.setModifier(.wholeApp, .shift)
-        XCTAssertEqual(target.config.wholeApp, .shift, "\(flow.errors)")
-    }
-
-    func testPickingTheOtherExtraKeySwapsThemInOneClick() {
-        flow.setModifier(.wholeApp, .shift)   // ⇧ was the next-screen key
-        XCTAssertEqual(target.config.wholeApp, .shift, "\(flow.errors)")
-        XCTAssertEqual(target.config.nextScreen, .ctrl)
-        flow.setModifier(.wholeApp, .ctrl)    // and back, from the other row's side
-        XCTAssertEqual(target.config.wholeApp, .ctrl)
-        XCTAssertEqual(target.config.nextScreen, .shift)
-        flow.setModifier(.nextScreen, .ctrl)
-        XCTAssertEqual(target.config.nextScreen, .ctrl, "\(flow.errors)")
-        XCTAssertEqual(target.config.wholeApp, .shift)
-    }
-
-    func testAnExtraKeyThatsAScreenKeySaysSoInPlainWords() {
-        flow.setModifier(.wholeApp, .alt)
-        XCTAssertEqual(flow.errors[Entry.wholeApp.key],
-                       "⌥ is one of the screen keys (⌥⌘ plus a number), so it can't also be an extra key. To use it here, take ⌥ out of the screen keys first.")
-        XCTAssertEqual(target.config, .defaults)
-        flow.toggleScreenMod(.shift)
-        XCTAssertEqual(flow.errors[Entry.screenBase.key],
-                       "⇧ is the extra key for the next screen, so it can't also be a screen key.")
-    }
-
     func testCloseDropsPendingAndRecording() {
         flow.scanFinished(ClashSources(apps: [safariU]))
         flow.record(.action(.sixty))

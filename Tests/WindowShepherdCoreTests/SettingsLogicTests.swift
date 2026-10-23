@@ -55,10 +55,12 @@ final class SettingsLogicTests: XCTestCase {
         XCTAssertEqual(vm.menu.keys, "⌃⌥⌘M")
     }
 
-    func testScreenChipsUseN() {
+    func testScreenKeysForEveryNumber() {
         let vm = settingsVM(config: .defaults, sources: ClashSources(), systemCheck: noSystem)
-        XCTAssertEqual(vm.screenChips.map(\.keys), ["⌥⌘n", "⌃⌥⌘n", "⌃⌥⌘n⇧"])
-        XCTAssertEqual(vm.screenChips.map(\.label), ["This window", "Every window of the app", "Every window of every app"])
+        XCTAssertEqual(vm.screenKeys.count, 9)
+        XCTAssertEqual(vm.screenKeys[0].map(\.keys), ["⌥⌘1", "⌃⌥⌘1", "⌃⌥⌘1⇧"])
+        XCTAssertEqual(vm.screenKeys[2].map(\.keys), ["⌥⌘3", "⌃⌥⌘3", "⌃⌥⌘3⇧"])
+        XCTAssertEqual(vm.screenKeys[0].map(\.label), ["This window", "Every window of the app", "Every window of every app"])
     }
 
     func testIsDefaultFlag() {

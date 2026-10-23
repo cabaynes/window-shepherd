@@ -8,8 +8,11 @@ final class SettingsModel: ObservableObject {
     let flow: SettingsFlow
     @Published private(set) var vm: SettingsVM
     @Published private(set) var revision = 0
+    /// The connected screens, numbered as the screen keys use them; kept live.
+    @Published private(set) var screens = Screens.destinations(Screens.live())
     private let recorder = KeyRecorder()
     private var scan: ScanHandle?
+    private var screenWatch: NSObjectProtocol?
 
     init(target: ShortcutApplying) {
         // Names for changed macOS shortcuts are read once per window; which
@@ -22,6 +25,10 @@ final class SettingsModel: ObservableObject {
         vm = flow.vm
         flow.onChange = { [weak self] in self?.refresh() }
         recorder.onKey = { [weak self] code, flags in self?.key(code, flags) }
+        screenWatch = NotificationCenter.default.addObserver(forName: NSApplication.didChangeScreenParametersNotification,
+                                               object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.screens = Screens.destinations(Screens.live()) }
+        }
     }
 
     private func refresh() {
@@ -55,6 +62,8 @@ final class SettingsModel: ObservableObject {
         scan = nil
         flow.closed()
         recorder.stop()
+        if let screenWatch { NotificationCenter.default.removeObserver(screenWatch) }
+        screenWatch = nil
     }
 
     func resignedKey() {

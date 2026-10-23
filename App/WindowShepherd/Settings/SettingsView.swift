@@ -48,23 +48,15 @@ struct SettingsView: View {
                 VStack(alignment: .leading, spacing: 0) {
                     section("Move the window you're using",
                             intro: "Each shortcut moves the window you're using. The list beside it is the same move "
-                                 + "with one extra key (set under Extra keys): for every window of that app, onto the "
+                                 + "with one extra key (see Extra keys): for every window of that app, onto the "
                                  + "next screen, or both.") {
                         rows(vm.rows.filter { $0.section == "This window" })
                     }
                     section("Corners") { rows(vm.rows.filter { $0.section == "Corners" }) }
-                    section("Extra keys", intro: "Hold one more key with any shortcut above.") {
-                        modifierRow(name: "Every window of the app", entry: .wholeApp,
-                                    note: example(vm, .wholeApp),
-                                    isOn: { $0 == vm.wholeApp }) { flow.setModifier(.wholeApp, $0) }
-                        Divider()
-                        modifierRow(name: "On the next screen", entry: .nextScreen, note: example(vm, .nextScreen),
-                                    isOn: { $0 == vm.nextScreen }) { flow.setModifier(.nextScreen, $0) }
-                    }
+                    section("Extra keys", intro: "Add one key to any shortcut above.") { extraKeys(vm) }
                     section("Send to a screen",
-                            intro: "Press these keys plus a screen's number: 1 is the laptop, then monitors from left to right.") {
-                        modifierRow(name: "Keys for screen n", entry: .screenBase, note: nil, list: vm.screenChips,
-                                    isOn: { vm.screenBase.contains($0) }) { flow.toggleScreenMod($0) }
+                            intro: "Hold \(symbols(vm.screenBase)) and press a screen's number. 1 is the laptop; monitors are numbered left to right.") {
+                        screenKeys(vm, screens: model.screens)
                     }
                     section("Open the menu") { rows([vm.menu]) }
                 }
@@ -298,54 +290,81 @@ struct SettingsView: View {
     }
 
     // MARK: Extra keys and screens
+    // Explainers only: the extra keys and screen keys are fixed (Charles, 2026-10-23).
 
-    /// A worked example from your own Left half keys, so it stays true after you change them.
-    private func example(_ vm: SettingsVM, _ entry: Entry) -> String? {
-        guard let left = vm.rows.first(where: { $0.entry == .action(.leftHalf) }) else { return nil }
-        switch entry {
-        case .wholeApp:
-            guard let all = left.chips.first(where: { $0.label == "Every window of the app" })?.keys else { return nil }
-            return "\(left.keys) puts the window you're using on the left half; \(all) does that to all of that app's windows."
-        case .nextScreen:
-            guard let next = left.chips.first(where: { $0.label == "On the next screen" })?.keys else { return nil }
-            return "\(next) puts the window you're using on the left half of the next screen."
-        default:
-            return nil
-        }
+    private func symbols(_ mods: Set<Mod>) -> String {
+        Mod.allCases.filter(mods.contains).map(\.symbol).joined()
     }
 
-    private func modifierRow(name: String, entry: Entry, note: String?, list: [ChipVM] = [],
-                             isOn: @escaping (Mod) -> Bool, tap: @escaping (Mod) -> Void) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
+    /// One line per extra key, with a worked example from your own Left half
+    /// keys, so it stays true after you change them.
+    @ViewBuilder
+    private func extraKeys(_ vm: SettingsVM) -> some View {
+        let left = vm.rows.first { $0.entry == .action(.leftHalf) }
+        let keys = { (label: String) in left?.chips.first { $0.label == label }?.keys }
+        extraKey(symbols([vm.wholeApp]), "Every window of the app",
+                 keys("Every window of the app").map { "\($0) puts all of that app's windows on the left half." })
+        Divider()
+        extraKey(symbols([vm.nextScreen]), "On the next screen",
+                 keys("On the next screen").map { "\($0) puts the window you're using on the left half of the next screen." })
+        Divider()
+        extraKey(symbols([vm.wholeApp, vm.nextScreen]), "Both",
+                 keys("Both").map { "\($0) puts all of that app's windows on the left half of the next screen." })
+    }
+
+    private func extraKey(_ keys: String, _ name: String, _ example: String?) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 10) {
+            Text(name).fontWeight(.medium).frame(width: 150, alignment: .leading)
+            Text(keys).font(.system(size: 15)).foregroundStyle(Color.accentColor).frame(width: 36, alignment: .leading)
+            if let example {
+                Text(example).font(listFont).foregroundStyle(.primary).fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.vertical, 8)
+    }
+
+    /// The screens connected now, then each screen key written out for every one
+    /// of them (at least screens 1 and 2, so a single screen still shows how it works).
+    private func screenKeys(_ vm: SettingsVM, screens: [Destination]) -> some View {
+        let shown = Array(vm.screenKeys.prefix(max(2, min(screens.count, vm.screenKeys.count))))
+        let scopes = shown.first?.map(\.label) ?? []
+        return VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .top, spacing: 10) {
-                Text(name).fontWeight(.medium).frame(width: 150, alignment: .leading).padding(.top, 4)
-                HStack(spacing: 6) {
-                    ForEach(Mod.allCases, id: \.self) { m in
-                        Button { tap(m) } label: {
-                            Text(m.symbol)
-                                .font(.system(size: 15))
-                                .frame(width: 32, height: 26)
-                                .foregroundStyle(isOn(m) ? Color.white : Color.primary)
-                                .background(RoundedRectangle(cornerRadius: 6).fill(isOn(m) ? Color.accentColor
-                                                                                           : Color(nsColor: .textBackgroundColor)))
-                                .overlay(RoundedRectangle(cornerRadius: 6).stroke(isOn(m) ? Color.accentColor
-                                                                                           : Color(nsColor: .separatorColor)))
-                                .contentShape(Rectangle())
+                Text("Connected now").fontWeight(.medium).frame(width: 150, alignment: .leading)
+                VStack(alignment: .leading, spacing: 2) {
+                    ForEach(screens, id: \.num) { d in
+                        HStack(spacing: 8) {
+                            Text("\(d.num)").fontWeight(.semibold).frame(width: 14, alignment: .trailing)
+                            Text(d.name)
                         }
-                        .buttonStyle(.plain)
                     }
-                }
-                if !list.isEmpty {
-                    variantList(list, base: list.first?.keys ?? "").padding(.leading, 12)
+                    if screens.count < 2 {
+                        Text("Only \(screens.first?.isLaptop == false ? "one screen is" : "the laptop is") connected. "
+                             + "Plug in a monitor and it becomes screen 2, \(shown.count > 1 ? shown[1][0].keys ?? "" : "").")
+                            .font(listFont).padding(.top, 2)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                 }
                 Spacer(minLength: 0)
             }
-            if let note {
-                Text(note).font(listFont).foregroundStyle(.primary)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .padding(.leading, 160)
+            Grid(alignment: .leading, horizontalSpacing: 14, verticalSpacing: 3) {
+                ForEach(Array(scopes.enumerated()), id: \.offset) { i, label in
+                    GridRow {
+                        Text(label).foregroundStyle(.primary).frame(width: 150, alignment: .leading)
+                        ForEach(Array(shown.enumerated()), id: \.offset) { _, keys in
+                            let c = keys[i]
+                            HStack(spacing: 2) {
+                                if c.level != nil { Text("⚠").foregroundStyle(color(c.level) ?? .primary) }
+                                keysText(c.keys ?? "", base: keys[0].keys ?? "", level: c.level).fixedSize()
+                            }
+                            .help(c.text ?? "")
+                        }
+                    }
+                }
             }
-            messages(entry: entry, clashes: clashes(list))
+            .font(listFont)
+            messages(entry: .screenBase, clashes: clashes(shown.flatMap { $0 }))
         }
         .padding(.vertical, 8)
     }

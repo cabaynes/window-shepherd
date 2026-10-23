@@ -71,6 +71,16 @@ final class MenuModelTests: XCTestCase {
         XCTAssertFalse(zip(single, single.dropFirst()).contains { $0 == "-" && $1 == "-" }, "no doubled separators")
     }
 
+    func testThreeScreensListBothOtherScreens() {
+        let dell2 = screen(3, "DELL B", x: 2000)
+        let moves = { (x: CGFloat) in self.titles(MenuModel.build(self.inputs(screens: [self.lap, self.dell, dell2], frontX: x)))
+            .filter { $0.hasPrefix("Move to") } }
+        XCTAssertEqual(moves(100), ["Move to DELL (2) — Full screen", "Move to DELL (2) — 90%", "Move to DELL (2) — same size",
+                                    "Move to DELL B (3) — Full screen", "Move to DELL B (3) — 90%", "Move to DELL B (3) — same size"])
+        XCTAssertEqual(moves(2100), ["Move to Laptop (1) — Full screen", "Move to Laptop (1) — 90%", "Move to Laptop (1) — same size",
+                                     "Move to DELL (2) — Full screen", "Move to DELL (2) — 90%", "Move to DELL (2) — same size"])
+    }
+
     func testMoveToKeys() {
         let menu = MenuModel.build(inputs())
         XCTAssertEqual(submenu(menu, "Move to DELL (2) — 90%")?.keys, "⌥⌘2")
