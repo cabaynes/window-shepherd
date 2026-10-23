@@ -740,7 +740,7 @@ docs/parity-checklist.md, docs/RELEASING.md, README.md, LICENSE, PRIVACY.md, CHA
 - Modify: `CLAUDE.md` (fill in "Repo layout"), `LICENSE` (add a Rectangle notice only if Rectangle code was copied; record the decision)
 
 - [ ] **Step 1:** Write the README, following the app-idea doc's "Open-source packaging". Sections: why it exists (the unplug problem), what it does (the menu, the keys table in ⌃⌥⌘ key ⇧ order, auto-restore), "different, not better" with honest credit to Rectangle, Stay, Moom and Display Maid, install (DMG / `brew install --cask cabaynes/tap/window-shepherd`, marked "coming soon" until the first release), permissions, "How it stays fast" (the hang-proof rules as an engineering story), building from source, and the tip link. Use the screenshot from Task 18.
-- [ ] **Step 2:** Run `grep -rniE "bookmarksync|sakebomb|fpspec|jessica|\.env" --include=*.md --include=*.swift --include=*.yml . | grep -v '^./.build'`. Expect no output (keeping the public repo clean).
+- [ ] **Step 2:** Run the private-name residue check (`git grep -niE` with the list of Charles's other project names, kept outside this public repo). Expect no output.
 - [ ] **Step 3:** Commit with the message "README, privacy statement, changelog".
 
 ### Task 21: Release pipeline, ready for enrollment

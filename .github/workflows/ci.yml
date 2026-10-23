@@ -1,0 +1,19 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test-and-build:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select the newest Xcode
+        run: sudo xcode-select -s "$(ls -d /Applications/Xcode*.app | sort -V | tail -1)"
+      - name: Unit tests
+        run: swift test
+      - name: Install XcodeGen
+        run: brew install xcodegen
+      - name: Build the app (ad-hoc signed, no secrets)
+        run: scripts/build.sh Debug

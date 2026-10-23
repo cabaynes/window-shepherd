@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>com.apple.security.app-sandbox</key>
+	<false/>
+	<!-- Debug only: development builds are signed with a personal or self-signed
+	     identity (no Team ID), which can't load the embedded Sparkle framework under
+	     the hardened runtime's library validation. Release builds are signed with a
+	     Developer ID, re-sign Sparkle with it, and don't carry this. -->
+	<key>com.apple.security.cs.disable-library-validation</key>
+	<true/>
+</dict>
+</plist>
