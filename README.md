@@ -52,7 +52,9 @@ Shortcuts are written in keyboard order: ⌃ ⌥ ⌘ key ⇧.
 | ⌃⌥⌘1⇧ · ⌃⌥⌘2⇧ … | **everything** → that screen |
 | ⌃⌥⌘M | the ⧉ menu, under the mouse |
 
-More keys means more windows. Every shortcut can be changed in **⧉ → Customize shortcuts…**: click a box and press the new keys. The window shows each derived shortcut beside it. Clashes with Window Shepherd itself, or with a macOS shortcut that would take the key first, are blocked in red. If an app uses the keys (it reads the menus of your open apps, plus a built-in list of 429 shortcuts from popular apps), it shows the clash in amber and asks before applying.
+More keys means more windows. Every shortcut can be changed in **⧉ → Customize shortcuts…**: click a box and press the new keys. The window shows each derived shortcut beside it. Clashes with Window Shepherd itself, or with a macOS shortcut that would take the key first, are blocked in red. If an app uses the keys (it reads the menus of your open apps, plus a built-in list of 429 shortcuts from popular apps), it shows the clash in amber and asks before applying. Background shortcuts no menu shows are covered too: Google Drive's search key, and Rectangle's keys while it runs (in purple).
+
+![Customize Shortcuts: each move's shortcut, the same move with an extra key beside it, and the apps that also use those keys](docs/images/customize-shortcuts.png)
 
 ## Different from Rectangle, not better
 
