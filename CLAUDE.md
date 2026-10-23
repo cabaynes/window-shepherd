@@ -13,7 +13,7 @@ Non-technical founder. See universal `user_profile.md` for collaboration prefere
 
 Design docs (private, out of repo) in `~/.claude/putdowns/window-shepherd/reference/`: the approved design `2026-10-19-window-shepherd-app-design.md`; background, APIs and hard-won lessons `window-mover-app-idea.md`; the Customize Shortcuts design and plan. Reference implementation: `~/CLAUDE/window-mover/hammerspoon/`.
 
-**All work happens here.** The window-mover folder is frozen (2026-10-21), kept only for reference and as the backup Hammerspoon runs until parity sign-off; don't open or change it.
+**All work happens here.** The window-mover folder is frozen (2026-10-21) and retired (2026-10-23: parity passed, Hammerspoon no longer loads it), kept only for reference; don't open or change it.
 
 ## Repo layout
 - `Sources/WindowShepherdCore/` — everything testable without a screen (shortcut model, clash rules, geometry, job runner, move engine `Engine/Shepherd*.swift`, auto-restore `Restore/`, menu model, clash scanner). `swift test` runs its tests.
