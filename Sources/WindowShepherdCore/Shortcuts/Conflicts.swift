@@ -26,7 +26,9 @@ public struct ClashSources: Equatable {
 }
 
 public struct Finding: Equatable {
-    public enum Level: Equatable { case block, warn }
+    /// block = can't be used; yield = another app has priority while it runs
+    /// (Rectangle); warn = an app uses it too.
+    public enum Level: Equatable { case block, yield, warn }
     public let level: Level
     public let source: String
     public let text: String
@@ -102,10 +104,10 @@ public enum Conflicts {
             add(e.combo, .warn, e.app, e.app + ": " + e.what + ". Yours will win.")
         }
         for e in sources.background {
-            add(e.combo, .warn, e.app, e.app + ": " + e.what + ". " + e.effect)
+            add(e.combo, e.yields ? .yield : .warn, e.app, e.app + ": " + e.what + ". " + e.effect)
         }
         for (id, list) in found {
-            found[id] = list.filter { $0.level == .block } + list.filter { $0.level == .warn }
+            found[id] = [Finding.Level.block, .yield, .warn].flatMap { l in list.filter { $0.level == l } }
         }
         return found
     }

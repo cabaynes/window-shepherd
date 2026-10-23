@@ -51,6 +51,14 @@ final class BackgroundShortcutsTests: XCTestCase {
         XCTAssertNil(BackgroundShortcuts.googleDrive(searchHotKey: nil))
     }
 
+    func testRectangleClashesAreItsOwnLevel() {
+        let next = BackgroundShortcuts.rectangle(prefs: ["alternateDefaultShortcuts": true]).first { $0.what == "Next display" }!
+        let found = Conflicts.check(bindings: [next.combo], sources: ClashSources(background: [next]))
+        let f = found[next.combo.id]!.first!
+        XCTAssertEqual(f.level, .yield)
+        XCTAssertEqual(f.text, "Rectangle: Next display. Rectangle has priority while it's running.")
+    }
+
     func testBackgroundClashText() {
         let drive = BackgroundShortcuts.googleDrive(searchHotKey: 592705486853)!
         let found = Conflicts.check(bindings: [drive.combo], sources: ClashSources(background: [drive]))

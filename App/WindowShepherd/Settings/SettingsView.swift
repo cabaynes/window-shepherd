@@ -11,6 +11,11 @@ private enum Palette {
                                                                       : NSColor(srgbRed: 0.54, green: 0.33, blue: 0, alpha: 1) })
     static let amberBG = Color(nsColor: NSColor(name: nil) { $0.isDark ? NSColor(srgbRed: 0.23, green: 0.18, blue: 0.09, alpha: 1)
                                                                         : NSColor(srgbRed: 1, green: 0.96, blue: 0.86, alpha: 1) })
+    // Keys Rectangle has priority on while it runs.
+    static let purple = Color(nsColor: NSColor(name: nil) { $0.isDark ? NSColor(srgbRed: 0.78, green: 0.68, blue: 1, alpha: 1)
+                                                                       : NSColor(srgbRed: 0.42, green: 0.22, blue: 0.75, alpha: 1) })
+    static let purpleBG = Color(nsColor: NSColor(name: nil) { $0.isDark ? NSColor(srgbRed: 0.18, green: 0.14, blue: 0.27, alpha: 1)
+                                                                         : NSColor(srgbRed: 0.95, green: 0.93, blue: 1, alpha: 1) })
 }
 
 private extension NSAppearance {
@@ -20,6 +25,7 @@ private extension NSAppearance {
 private func color(_ level: Finding.Level?) -> Color? {
     switch level {
     case .block?: return Palette.red
+    case .yield?: return Palette.purple
     case .warn?: return Palette.amber
     case nil: return nil
     }
@@ -46,6 +52,18 @@ struct SettingsView: View {
         VStack(alignment: .leading, spacing: 0) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
+                    let yielded = rectangleCount(vm)
+                    if yielded > 0 {
+                        Text("Rectangle is running and has priority on \(yielded == 1 ? "1 of your shortcuts" : "\(yielded) of your shortcuts"), "
+                             + "marked in purple below. Everything else works.")
+                            .font(.callout)
+                            .foregroundStyle(Palette.purple)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .padding(8)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(RoundedRectangle(cornerRadius: 6).fill(Palette.purpleBG))
+                            .padding(.top, 14)
+                    }
                     section("Move the window you're using",
                             intro: "Each shortcut moves the window you're using. The list beside it is the same move "
                                  + "with one extra key (see Extra keys): for every window of that app, onto the "
@@ -157,7 +175,7 @@ struct SettingsView: View {
         let recording = flow.recording == r.entry
         let error = flow.errors[r.entry.key] != nil
         let border: Color = recording ? .accentColor : (error || r.level == .block) ? Palette.red
-            : r.level == .warn ? Palette.amber : Color(nsColor: .separatorColor)
+            : color(r.level) ?? Color(nsColor: .separatorColor)
         return Button {
             if recording { flow.stopRecording() } else { flow.record(r.entry) }
         } label: {
@@ -247,7 +265,15 @@ struct SettingsView: View {
                 })
             }
         } else if !clashes.isEmpty {
-            clashBox(clashes)
+            // Rectangle's keys get their own purple box, so they're easy to spot.
+            let yields = clashes.filter { $0.level == .yield }, others = clashes.filter { $0.level != .yield }
+            VStack(alignment: .leading, spacing: 6) {
+                if !yields.isEmpty {
+                    clashBox(yields, title: "Rectangle has priority while it's running",
+                             suffix: " Rectangle has priority while it's running.", color: Palette.purple, bg: Palette.purpleBG)
+                }
+                if !others.isEmpty { clashBox(others) }
+            }
         }
     }
 
@@ -257,18 +283,25 @@ struct SettingsView: View {
         let wins = " Yours will win."
         let anyWins = list.contains { $0.text.hasSuffix(wins) }
         let title = (list.count == 1 ? "Potential conflict" : "Potential conflicts") + (anyWins ? " (Window Shepherd wins)" : "")
-        return VStack(alignment: .leading, spacing: 3) {
+        return clashBox(list, title: title, suffix: wins, color: Palette.amber,
+                        bg: blocked ? Palette.redBG : Palette.amberBG, titleColor: blocked ? Palette.red : Palette.amber)
+    }
+
+    /// A titled list of clashes; `suffix`, when every line would end with it, is said once in the title instead.
+    private func clashBox(_ list: [Clash], title: String, suffix: String, color: Color, bg: Color,
+                          titleColor: Color? = nil) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
             Text(title)
                 .fontWeight(.semibold)
-                .foregroundStyle(blocked ? Palette.red : Palette.amber)
+                .foregroundStyle(titleColor ?? color)
             Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 10, verticalSpacing: 2) {
                 ForEach(list, id: \.self) { c in
                     GridRow {
                         Text(c.keys).fontWeight(.medium)
-                        Text(c.text.hasSuffix(wins) ? String(c.text.dropLast(wins.count)) : c.text)
+                        Text(c.text.hasSuffix(suffix) ? String(c.text.dropLast(suffix.count)) : c.text)
                             .fixedSize(horizontal: false, vertical: true)
                     }
-                    .foregroundStyle(c.level == .block ? Palette.red : Palette.amber)
+                    .foregroundStyle(c.level == .block ? Palette.red : color)
                 }
             }
         }
@@ -276,8 +309,16 @@ struct SettingsView: View {
         .padding(.horizontal, 8)
         .padding(.vertical, 6)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 6).fill(blocked ? Palette.redBG : Palette.amberBG))
+        .background(RoundedRectangle(cornerRadius: 6).fill(bg))
         .padding(.leading, 160)
+    }
+
+    /// How many of your shortcuts Rectangle has priority on right now.
+    private func rectangleCount(_ vm: SettingsVM) -> Int {
+        let rows = vm.rows + [vm.menu]
+        let rowKeys = rows.filter { $0.level == .yield }.map(\.keys)
+        let chipKeys = (rows.flatMap(\.chips) + vm.screenKeys.flatMap { $0 }).filter { $0.level == .yield }.compactMap(\.keys)
+        return Set(rowKeys + chipKeys).count
     }
 
     private func message(_ text: String, level: Finding.Level) -> some View {

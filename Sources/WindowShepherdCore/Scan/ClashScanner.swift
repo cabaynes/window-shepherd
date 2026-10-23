@@ -171,7 +171,9 @@ public final class ClashScanner {
         var sources = ClashSources(system: SystemShortcuts.entries(for: combos),
                                    apps: KnownShortcuts.shared.apps + UserKeyEquivalents.all(running: running),
                                    background: BackgroundShortcuts.live(
-                                       rectangleRunning: running.contains { $0.id == BackgroundShortcuts.rectangleID }))
+                                       // Any app, not just regular ones: Rectangle lives in the menu bar.
+                                       rectangleRunning: NSWorkspace.shared.runningApplications
+                                           .contains { $0.bundleIdentifier == BackgroundShortcuts.rectangleID }))
         onUpdate(sources, 0, apps.count)
         let reader = self.reader, limits = self.limits
         queue.async {

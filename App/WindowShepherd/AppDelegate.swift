@@ -171,7 +171,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             MainActor.assumeIsolated {
                 let alert = NSAlert()
                 alert.messageText = "Rectangle is running and uses \(n): \(keys)"
-                alert.informativeText = "Rectangle gets those while it runs; everything else works. To use Window "
+                alert.informativeText = "Rectangle will have priority for those shortcuts while it is running; everything else "
+                    + "on Window Shepherd works. To use Window "
                     + "Shepherd's, quit Rectangle and turn off \u{201C}Launch on login\u{201D} in its settings, or uninstall it."
                 alert.addButton(withTitle: "OK")
                 alert.addButton(withTitle: "Show shortcuts")

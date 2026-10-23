@@ -7,8 +7,10 @@ public struct BackgroundShortcut: Equatable {
     public let app: String
     public let what: String
     public let effect: String
-    public init(combo: Combo, app: String, what: String, effect: String) {
-        self.combo = combo; self.app = app; self.what = what; self.effect = effect
+    /// True when Window Shepherd steps aside on it while the app runs (Rectangle).
+    public let yields: Bool
+    public init(combo: Combo, app: String, what: String, effect: String, yields: Bool = false) {
+        self.combo = combo; self.app = app; self.what = what; self.effect = effect; self.yields = yields
     }
 }
 
@@ -83,7 +85,7 @@ public enum BackgroundShortcuts {
         }
         return keys.sorted { $0.key < $1.key }.map {
             BackgroundShortcut(combo: $0.value, app: "Rectangle", what: humanized($0.key),
-                               effect: "Rectangle gets it while it's running.")
+                               effect: "Rectangle has priority while it's running.", yields: true)
         }
     }
 
