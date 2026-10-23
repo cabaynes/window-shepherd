@@ -169,7 +169,9 @@ public final class ClashScanner {
         let running = NSWorkspace.shared.runningApplications.filter { $0.activationPolicy == .regular }
             .compactMap { a in a.bundleIdentifier.map { (id: $0, name: a.localizedName ?? $0) } }
         var sources = ClashSources(system: SystemShortcuts.entries(for: combos),
-                                   apps: KnownShortcuts.shared.apps + UserKeyEquivalents.all(running: running))
+                                   apps: KnownShortcuts.shared.apps + UserKeyEquivalents.all(running: running),
+                                   background: BackgroundShortcuts.live(
+                                       rectangleRunning: running.contains { $0.id == BackgroundShortcuts.rectangleID }))
         onUpdate(sources, 0, apps.count)
         let reader = self.reader, limits = self.limits
         queue.async {

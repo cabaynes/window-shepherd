@@ -18,7 +18,11 @@ public struct AppShortcut: Equatable {
 public struct ClashSources: Equatable {
     public var system: [SystemShortcut]
     public var apps: [AppShortcut]
-    public init(system: [SystemShortcut] = [], apps: [AppShortcut] = []) { self.system = system; self.apps = apps }
+    /// Other apps' global shortcuts (Rectangle, Google Drive).
+    public var background: [BackgroundShortcut]
+    public init(system: [SystemShortcut] = [], apps: [AppShortcut] = [], background: [BackgroundShortcut] = []) {
+        self.system = system; self.apps = apps; self.background = background
+    }
 }
 
 public struct Finding: Equatable {
@@ -96,6 +100,9 @@ public enum Conflicts {
         }
         for e in sources.apps {
             add(e.combo, .warn, e.app, e.app + ": " + e.what + ". Yours will win.")
+        }
+        for e in sources.background {
+            add(e.combo, .warn, e.app, e.app + ": " + e.what + ". " + e.effect)
         }
         for (id, list) in found {
             found[id] = list.filter { $0.level == .block } + list.filter { $0.level == .warn }

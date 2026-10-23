@@ -17,7 +17,7 @@ func findings(for cfg: ShortcutConfig, sources: ClashSources,
               systemCheck: ([Combo]) -> [SystemShortcut]) -> ([String: [Finding]], [ShortcutBinding]) {
     let bindings = derive(cfg)
     let combos = bindings.map(\.combo)
-    let merged = ClashSources(system: systemCheck(combos), apps: sources.apps)
+    let merged = ClashSources(system: systemCheck(combos), apps: sources.apps, background: sources.background)
     return (Conflicts.check(bindings: combos, sources: merged), bindings)
 }
 

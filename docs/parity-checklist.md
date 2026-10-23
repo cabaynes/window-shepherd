@@ -11,7 +11,7 @@ Legend: **A** = `scripts/e2e.sh` checks it automatically · **M** = check by han
 - [x] **M U** "Keyboard shortcuts" submenu: every shortcut, in full-strength text (not grey)
 - [x] **M U** "Move to <screen> (n) — Full screen / 90% / same size" lists only screens the front window isn't on
 - [x] **M U** With one screen connected, the "Move to" section is hidden
-- [ ] **M U** A "Move to" chosen after its screen was unplugged says "<name> (n) isn't connected anymore"
+- [x] **M U** A "Move to" chosen after its screen was unplugged says "<name> (n) isn't connected anymore"
 - [x] **M** The ⧉ turns red while a move or restore is running
 - [x] **M** ⌃⌥⌘M opens the menu under the mouse
 - [x] **M** The bottom of the menu: Customize shortcuts…, Keyboard shortcuts, Launch at Login, About Window Shepherd, Check for Updates…, Quit Window Shepherd
@@ -35,30 +35,30 @@ Legend: **A** = `scripts/e2e.sh` checks it automatically · **M** = check by han
 | ⌃⌥⌘1⇧ / ⌃⌥⌘2⇧ … | everything → screen n | M |
 | ⌃⌥⌘M | the menu under the mouse | M |
 
-- [ ] **M U** Number keys exist only for screens that are connected (and only with 2 or more screens)
+- [x] **M U** Number keys exist only for screens that are connected (and only with 2 or more screens)
 - [x] **M** Single-window keyboard moves are silent; bulk moves show "Moved N windows → …"
 - [x] **M** A whole-app move brings that app to the front; an "Everything" move doesn't change the front app
 
 ## Auto-restore
 
 - [x] **M U** Every window's spot is remembered per combination of connected screens
-- [ ] **U** A spot is recorded only after it's been seen twice, about 2 s apart
+- [x] **U** A spot is recorded only after it's been seen twice, about 2 s apart
 - [x] **M U** After a screen change, windows go back at +3 / +10 / +20 s
 - [x] **M U** A window you move during those passes isn't put back
-- [ ] **U** Spots macOS dumped windows in aren't recorded as their home
-- [ ] **U** Windows unseen for 30 days are forgotten (minimized and other-Space windows are kept until then)
+- [x] **U** Spots macOS dumped windows in aren't recorded as their home
+- [x] **U** Windows unseen for 30 days are forgotten (minimized and other-Space windows are kept until then)
 - [x] **M** Remembered spots survive quitting and reopening the app
 - [x] **M** **One real unplug → replug of the Dell** puts every window back
 
 ## Apps that don't respond
 
-- [ ] **U** An app that doesn't answer is retried 2 s and 4 s later within the same job, then skipped and named in the message
+- [x] **U** An app that doesn't answer is retried 2 s and 4 s later within the same job, then skipped and named in the message
 - [ ] **M U** For 2 minutes the menu offers "Retry N windows that didn't move", listing them
 
 ## Customize Shortcuts window
 
 - [x] **M** One recorder box per action; derived chips (whole app / next screen / both) beside each
-- [ ] **M** "Extra keys" and "Send to a screen" explain ⌃ / ⇧ / both and ⌥⌘ + number, with no buttons (the keys are fixed since 2026-10-23, Charles's call)
+- [x] **M** "Extra keys" and "Send to a screen" explain ⌃ / ⇧ / both and ⌥⌘ + number, with no buttons (the keys are fixed since 2026-10-23, Charles's call)
 - [x] **M U** Red = blocked (clashes with Window Shepherd itself, or macOS would take it first)
 - [x] **M U** Amber = used by an app; Keep or Cancel before it applies
 - [x] **M** A change made while "Checking your open apps…" waits for the check
@@ -77,4 +77,4 @@ Legend: **A** = `scripts/e2e.sh` checks it automatically · **M** = check by han
 
 - [ ] **M** First launch without permission shows the Accessibility onboarding; it notices when permission is granted
 - [ ] **M** Launch at Login is on after onboarding and can be switched off
-- [ ] **M** About shows the version, Charles Baynes and windowshepherd.com
+- [x] **M** About shows the version, Charles Baynes and windowshepherd.com
