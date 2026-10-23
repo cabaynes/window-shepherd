@@ -6,15 +6,15 @@ Legend: **A** = `scripts/e2e.sh` checks it automatically · **M** = check by han
 
 ## Menu (⧉)
 
-- [ ] **M U** The ⧉ menu lists actions first, then the scope: This window / All <front app> windows / Everything / every other app A–Z
-- [ ] **M U** Shortcuts appear beside the action rows and the scope rows, in ⌃ ⌥ ⌘ key ⇧ order
-- [ ] **M U** "Keyboard shortcuts" submenu: every shortcut, in full-strength text (not grey)
-- [ ] **M U** "Move to <screen> (n) — Full screen / 90% / same size" lists only screens the front window isn't on
+- [x] **M U** The ⧉ menu lists actions first, then the scope: This window / All <front app> windows / Everything / every other app A–Z
+- [x] **M U** Shortcuts appear beside the action rows and the scope rows, in ⌃ ⌥ ⌘ key ⇧ order
+- [x] **M U** "Keyboard shortcuts" submenu: every shortcut, in full-strength text (not grey)
+- [x] **M U** "Move to <screen> (n) — Full screen / 90% / same size" lists only screens the front window isn't on
 - [ ] **M U** With one screen connected, the "Move to" section is hidden
 - [ ] **M U** A "Move to" chosen after its screen was unplugged says "<name> (n) isn't connected anymore"
-- [ ] **M** The ⧉ turns red while a move or restore is running
-- [ ] **M** ⌃⌥⌘M opens the menu under the mouse
-- [ ] **M** The bottom of the menu: Customize shortcuts…, Keyboard shortcuts, Launch at Login, About Window Shepherd, Check for Updates…, Quit Window Shepherd
+- [x] **M** The ⧉ turns red while a move or restore is running
+- [x] **M** ⌃⌥⌘M opens the menu under the mouse
+- [x] **M** The bottom of the menu: Customize shortcuts…, Keyboard shortcuts, Launch at Login, About Window Shepherd, Check for Updates…, Quit Window Shepherd
 
 ## Keyboard shortcuts (defaults)
 
@@ -25,7 +25,7 @@ Legend: **A** = `scripts/e2e.sh` checks it automatically · **M** = check by han
 | ⌥⌘G | this window: 90% | A |
 | ⌥⌘H | this window: 60% | A |
 | ⌥⌘C | this window: centered, same size | A |
-| ⌃⌘↑ ⌃⌘→ ⌃⌘↓ ⌃⌘← | this window: top-left / top-right / bottom-left / bottom-right corner | A (↑ →), M (↓ ←) |
+| ⌃⌘↑ ⌃⌘→ ⌃⌘← ⌃⌘↓ | this window: top-left / top-right / bottom-left / bottom-right corner (← and ↓ swapped from the Hammerspoon mover, Charles 2026-10-23) | A (↑ →), M (← ↓) |
 | add ⌃ (e.g. ⌃⌥⌘G) | every window of the front app | A (⌃⌥⌘G) |
 | add ⇧ (e.g. ⌥⌘G⇧) | on the next screen | A (⌥⌘G⇧) |
 | ⌃ and ⇧ (e.g. ⌃⌥⌘G⇧) | every window of the app, on the next screen | M |

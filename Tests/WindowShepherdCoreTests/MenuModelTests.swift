@@ -100,7 +100,7 @@ final class MenuModelTests: XCTestCase {
             "#THIS WINDOW",
             "⌥⌘ ← → ↑ ↓ | Left / right / top / bottom half",
             "⌥⌘F | Full screen", "⌥⌘G | 90%", "⌥⌘H | 60%", "⌥⌘C | Center (keep size)",
-            "⌃⌘ ↑ → ↓ ← | Top left / top right / bottom left / bottom right",
+            "⌃⌘ ↑ → ← ↓ | Top left / top right / bottom left / bottom right",
             "-", "#ADD A KEY",
             "+ ⌃ | Every window of the app   (not corners: use the menu)",
             "+ ⇧ | On the next screen   (⌥⌘C⇧ = this window to the next screen, same size)",

@@ -44,7 +44,7 @@ Shortcuts are written in keyboard order: ⌃ ⌥ ⌘ key ⇧.
 |---|---|
 | ⌥⌘ ← → ↑ ↓ | this window: left / right / top / bottom half |
 | ⌥⌘F · ⌥⌘G · ⌥⌘H · ⌥⌘C | full screen · 90% · 60% · center |
-| ⌃⌘ ↑ → ↓ ← | top-left · top-right · bottom-left · bottom-right corner |
+| ⌃⌘ ↑ → ← ↓ | top-left · top-right · bottom-left · bottom-right corner |
 | **add ⌃** | …to **every window of the app** (⌃⌥⌘G = all of Safari at 90%) |
 | **add ⇧** | …on the **next screen** (⌥⌘G⇧ = this window, 90%, on the other monitor) |
 | ⌥⌘1 · ⌥⌘2 … | this window → screen 1 (the laptop, full screen), 2, 3… (monitors left to right, 90%) |

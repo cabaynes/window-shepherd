@@ -64,7 +64,8 @@ public struct ShortcutConfig: Equatable {
     }
 
     /// Charles's scheme (2026-10-19): ⌥⌘ + key = this window; corners on ⌃⌘
-    /// arrows (his old Rectangle layout); ⌃ = whole app; ⇧ = next screen.
+    /// arrows (his old Rectangle layout, with ← and ↓ swapped 2026-10-23 so the
+    /// corners go round clockwise: ↑ top left, → top right, ↓ bottom right, ← bottom left); ⌃ = whole app; ⇧ = next screen.
     public static var defaults: ShortcutConfig {
         ShortcutConfig(
             actions: [
@@ -73,7 +74,7 @@ public struct ShortcutConfig: Equatable {
                 .leftHalf: Combo("left", .alt, .cmd), .rightHalf: Combo("right", .alt, .cmd),
                 .topHalf: Combo("up", .alt, .cmd), .bottomHalf: Combo("down", .alt, .cmd),
                 .topLeft: Combo("up", .ctrl, .cmd), .topRight: Combo("right", .ctrl, .cmd),
-                .bottomLeft: Combo("down", .ctrl, .cmd), .bottomRight: Combo("left", .ctrl, .cmd),
+                .bottomLeft: Combo("left", .ctrl, .cmd), .bottomRight: Combo("down", .ctrl, .cmd),
             ],
             wholeApp: .ctrl, nextScreen: .shift, screenBase: [.alt, .cmd],
             menu: Combo("m", .ctrl, .alt, .cmd))
