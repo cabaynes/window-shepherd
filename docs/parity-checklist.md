@@ -53,7 +53,7 @@ Legend: **A** = `scripts/e2e.sh` checks it automatically · **M** = check by han
 ## Apps that don't respond
 
 - [x] **U** An app that doesn't answer is retried 2 s and 4 s later within the same job, then skipped and named in the message
-- [ ] **M U** For 2 minutes the menu offers "Retry N windows that didn't move", listing them
+- [x] **M U** For 2 minutes the menu offers "Retry N windows that didn't move", listing them
 
 ## Customize Shortcuts window
 
@@ -70,11 +70,11 @@ Legend: **A** = `scripts/e2e.sh` checks it automatically · **M** = check by han
 
 ## Coexistence
 
-- [ ] **M** While Rectangle runs, only the keys it shares switch off (with a one-time notice and a ⧉ menu row); they come back when it quits. Changed from "all action keys off" 2026-10-23, Charles's call
+- [x] **M** While Rectangle runs, only the keys it shares switch off (with a one-time notice and a ⧉ menu row); they come back when it quits. Changed from "all action keys off" 2026-10-23, Charles's call
 - [x] **M** The Hammerspoon mover pauses while Window Shepherd runs, and comes back when it quits (verified 2026-10-19 by Claude: pause/resume logged, ⧉ icon hidden and restored, 51 hotkeys live after resume)
 
 ## New for strangers
 
-- [ ] **M** First launch without permission shows the Accessibility onboarding; it notices when permission is granted
-- [ ] **M** Launch at Login is on after onboarding and can be switched off
+- [x] **M** First launch without permission shows the Accessibility onboarding; it notices when permission is granted
+- [x] **M** Launch at Login is on after onboarding and can be switched off
 - [x] **M** About shows the version, Charles Baynes and windowshepherd.com
