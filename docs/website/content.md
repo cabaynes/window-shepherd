@@ -2,7 +2,7 @@
 
 This is the single place for what the Window Shepherd website says: the story, the pitch, every fact and claim, the comparison with Rectangle, and the structure of the page. Every fact on the page must appear here first. Every **[verify at release]** item must be rechecked on the shipped build before launch.
 
-- **Status:** draft 2, 2026-10-23. Draft 1 was reviewed by five readers: a long-time Rectangle user, a non-technical office worker, a product manager who works at two desks, a fact-checker working from the code, and a landing-page writer. What changed because of them is in section 12. The app isn't downloadable yet: signing waits on Apple Developer enrollment.
+- **Status:** draft 2.1, 2026-10-24 (draft 2 was 2026-10-23). Draft 1 was reviewed by five readers: a long-time Rectangle user, a non-technical office worker, a product manager who works at two desks, a fact-checker working from the code, and a landing-page writer. What changed because of them is in section 12. The app isn't downloadable yet: signing waits on Apple Developer enrollment.
 - **The site:** one page at windowshepherd.com (domain at Squarespace). How it's built and hosted is decided later.
 - **Voice:** first person, Charles, soft and plain. See section 8.
 - **Marking:**
@@ -17,13 +17,13 @@ This is the single place for what the Window Shepherd website says: the story, t
 
 > **Your windows, back where they were.**
 >
-> A free Mac app I built for myself. It remembers where every window was for each screen setup, puts them back when you plug in again, and can move every window of an app with one shortcut.
+> A free Mac app I built, mostly for myself. It remembers where every window was for each different multi-screen setup you use, puts them back when you plug in again, and can easily move all windows of an app with a simple click.
 
 Under the button: **Free · Open source · macOS 14 or later**
 
 Right under the hero, for the people who will never touch a shortcut (the non-technical reviewer's most important point):
 
-> You don't have to learn any shortcuts. Once it's running, it puts your windows back by itself when you plug your monitor in. If you'd like to move windows yourself, there's a small menu at the top of your screen, and shortcuts too if you like them.
+> You don't have to learn any shortcuts. Once it's running, it puts your windows back by itself when you plug your external monitor in. If you'd like to move windows yourself, there's a small menu at the top of your screen, and shortcuts too if you like them.
 
 ### Other headline candidates **[Charles?]**
 
@@ -35,10 +35,12 @@ Right under the hero, for the people who will never touch a shortcut (the non-te
 ### What the page is built on (two moments, and one idea that ties them together)
 
 1. **The replug.** Sit down at either desk, plug in, and your windows go back to how you left them there. There's nothing to save.
-2. **"Move all of these over there."** One shortcut, or one click, sends every window of an app (or everything) to another screen.
-3. The idea that ties them together: **more keys, more windows.** One key moves this window, add ⌃ for every window of the app, add ⇧ for the next screen.
+2. **One window, a whole app, or everything.** Every action works at three sizes of "who":
+   - **Tidy up where they are.** Maximize, 90%, 60%, center, a half or a corner, for this window, every window of an app, or everything at once. Each window is resized on the screen it's already on. (Charles, 2026-10-24: this was missing from draft 2.)
+   - **Send them somewhere.** Move this window, every window of an app, or everything to another screen.
+3. The idea that ties them together: **more keys, more windows.** One key acts on this window, add ⌃ for every window of the app, add ⇧ to do it on the next screen. "Everything" is one click in the menu, or ⌃⌥⌘ + a screen number to send it all to that screen.
 
-Single-window snapping (halves, 90%, corners) is something Rectangle already does well. It supports the page but doesn't sell it, so it doesn't get its own section.
+Single-window snapping on its own is something Rectangle already does well. What's different here is doing the same thing to many windows at once, so that's how the page presents it.
 
 ### The honest version of the replug pitch (important)
 
@@ -61,7 +63,7 @@ Write to these people; don't name them as personas on the page.
 
 - **The two-desks person.** Home desk with one monitor, office desk with a different one. This is the strongest case and should lead Moment 1.
 - **The laptop-plus-monitor person.** Unplugs for meetings, plugs back in, rearranges by hand every time. Often not a keyboard person at all.
-- **The many-windows person.** Six Chrome windows, three VS Code windows, Slack, Figma. Moving "all of Chrome" to the big screen is the daily chore.
+- **The many-windows person.** Six Chrome windows, three VS Code windows, Slack, Figma. Moving "all of Chrome" to the big screen, or making all of them the same size again after they drift, is the daily chore.
 - **The Rectangle person.** Knows ⌥⌘←, wants the replug and the whole-app moves on top.
 
 Who it's probably **not** for. Say this kindly, in the FAQ:
@@ -78,7 +80,7 @@ Agreed direction from the reviews: show the proof before the person, and keep th
 
 1. **Hero:** headline, subhead, the "no shortcuts needed" line, the replug clip (must-have, see 10), and the button.
 2. **The replug (two desks):** 3–4 short lines plus the honest macOS line.
-3. **Move all of these:** the four-step "more keys, more windows" ladder with examples, and a mouse-first menu screenshot.
+3. **One window, a whole app, or everything:** tidy up in place (maximize, 90%, center, halves) and send to another screen, for one window, all of an app's windows, or everything. The four-step "more keys, more windows" ladder, and a mouse-first menu screenshot.
 4. **The story:** Charles's intro, about 90 words, with an optional photo.
 5. **How to start, in 3 steps:** install, allow Accessibility (with the reassurance text), then just work.
 6. **Using it with Rectangle:** prose, not a table (section 4.5).
@@ -113,16 +115,22 @@ The button says "Watch for the release on GitHub". Don't set up an email list: i
 
 **[Charles?]** "I work at two desks with two different monitors": is this true for you? If not, rewrite it as "If you work at two desks…".
 
-### 4.2 Move all of these
+### 4.2 One window, a whole app, or everything
 
-> **Move one window, every window of an app, or everything.**
+> **Resize, maximize, center or move: one window, every window of an app, or everything.**
+>
+> When my windows drift into a mess, I can tidy them in one go. I make every Chrome window the same 90%, center them all, or maximize everything, each on the screen it's already on. And when I want them on another screen, it's the same idea: one window, a whole app, or everything.
 >
 > ⌥⌘G puts this window at 90%.
 > Add ⌃ to do it for every window of the app: ⌃⌥⌘G.
 > Add ⇧ to do it on the next screen: ⌥⌘G⇧.
 > And ⌃⌥⌘2 sends every window of the app to screen 2, while ⌃⌥⌘2⇧ sends everything.
 >
-> Prefer the mouse? Click the icon in the menu bar, pick a size, then pick this window, all of an app's windows, or everything.
+> Prefer the mouse? Click the icon at the top of your screen, pick a size (full screen, 90%, 60%, center, a half or a corner), then pick this window, all of an app's windows, everything, or any other open app by name.
+
+The sizes are full screen, 90%, 60%, centered at the same size, the four halves and the four corners. Show one example of each "who" on the page, rather than the full grid of sizes times scopes.
+
+**[Charles?]** "When my windows drift into a mess…" is written as your habit. Keep it, or say "When windows drift into a mess…".
 
 Teach the symbols once, near the first one: "⌃ is Control, ⌥ is Option, ⌘ is Command, ⇧ is Shift."
 
@@ -196,6 +204,10 @@ Checked against `main` at 9191ace and the parity checklist (all 37 lines live-te
 
 ### 5.2 Moves
 
+- **Every size works on three scopes**: full screen, 90%, 60%, center (same size), the four halves and the four corners. The scopes are this window, every window of an app, and everything. Sizes act on the screen each window is already on. "Move to <screen>" and the ⇧ / number keys change screens.
+  - **Keyboard:** this window (⌥⌘ + key) and every window of the front app (add ⌃; not the corners, which already use ⌃).
+  - **Menu:** this window, all of the front app's windows, **everything**, or **any other open app by name**, without switching to it first. Resizing everything in place has no keyboard shortcut; it's one click in the menu (`MenuModel.swift:132-146`).
+  - **Everything to one screen:** ⌃⌥⌘ + screen number + ⇧, or "Move to" in the menu.
 - Moves act on normal windows that are on screen now. Windows on other Spaces aren't moved.
 - Floating panels and toolbars are never moved (for example Zoom's meeting controls). A regular Zoom meeting window is moved like any other window.
 - **Whole-app moves** bring that app to the front. **"Everything" moves** don't change the front app (`Shepherd.swift:114-116`).
@@ -412,7 +424,7 @@ Never claim to be the only one.
 - **On the page:**
   - per screen setup, nothing to save, leaves your moves alone
   - "keeps trying for about 20 seconds"
-  - whole app or everything, one shortcut or click
+  - resize, maximize, center or move: one window, a whole app, or everything, with one shortcut or click
   - the four-step ladder
   - a frozen app is skipped and named
   - collects nothing, one permission, free and open
@@ -477,7 +489,14 @@ Never claim to be the only one.
 
 ---
 
-## 12. Review log (draft 1 → draft 2)
+## 12. Review log
+
+### Draft 2 → 2.1 (Charles, 2026-10-24)
+
+- The hero subhead was reworded by Charles.
+- Resizing, maximizing and centering in place, for one window, a whole app or everything, was missing as a headline claim. It's now part of the backbone (1), the section order (3), the copy (4.2), the facts (5.2) and the page list (9).
+
+### Draft 1 → draft 2
 
 - **Non-technical reader:**
   - The page never said shortcuts are optional, so the "no shortcuts needed" line now sits right under the hero.
