@@ -2,7 +2,7 @@
 
 This is the single place for what the Window Shepherd website says: the story, the pitch, every fact and claim, the comparison with Rectangle, and the structure of the page. Every fact on the page must appear here first. Every **[verify at release]** item must be rechecked on the shipped build before launch.
 
-- **Status:** draft 2.1, 2026-10-24 (draft 2 was 2026-10-23). Draft 1 was reviewed by five readers: a long-time Rectangle user, a non-technical office worker, a product manager who works at two desks, a fact-checker working from the code, and a landing-page writer. What changed because of them is in section 12. The app isn't downloadable yet: signing waits on Apple Developer enrollment.
+- **Status:** draft 2.2, 2026-10-24 (draft 2 was 2026-10-23). Draft 1 was reviewed by five readers: a long-time Rectangle user, a non-technical office worker, a product manager who works at two desks, a fact-checker working from the code, and a landing-page writer. What changed because of them is in section 12. The app isn't downloadable yet: signing waits on Apple Developer enrollment.
 - **The site:** one page at windowshepherd.com (domain at Squarespace). How it's built and hosted is decided later.
 - **Voice:** first person, Charles, soft and plain. See section 8.
 - **Marking:**
@@ -15,22 +15,35 @@ This is the single place for what the Window Shepherd website says: the story, t
 
 ### Headline and subhead (hero)
 
-> **Your windows, back where they were.**
+> **Quickly tidy your app windows, move them between screens, and put it all back the way it was.**
 >
-> A free Mac app I built, mostly for myself. It remembers where every window was for each different multi-screen setup you use, puts them back when you plug in again, and can easily move all windows of an app with a simple click.
+> A free Mac app I built, mostly for myself. Quickly resize or maximize a single window, an entire app, or everything open, at once. It also remembers where every window was for each different multi-screen setup you use, puts them back when you plug in again, and can easily move windows between those screens with a single click.
 
 Under the button: **Free · Open source · macOS 14 or later**
 
 Right under the hero, for the people who will never touch a shortcut (the non-technical reviewer's most important point):
 
-> You don't have to learn any shortcuts. Once it's running, it puts your windows back by itself when you plug your external monitor in. If you'd like to move windows yourself, there's a small menu at the top of your screen, and shortcuts too if you like them.
+> You don't have to learn any shortcuts. Once it's running, it puts your windows back by itself when you plug your external monitor in. If you'd like to move windows yourself, there's a small menu at the top of your screen, and keyboard shortcuts too if you like them.
 
-### Other headline candidates **[Charles?]**
+And one line for the Rectangle users who'll arrive asking "how is this different?" (point 1 below), linking down to section 6 of the page:
 
-1. Your windows, back where they were. (recommended)
-2. Unplug, replug, and everything's back where it was.
-3. For people with lots of windows and more than one screen.
-4. A small Mac app that remembers where your windows go.
+> If you use Rectangle, think of this as a supplement: it does the things I wished Rectangle did, and you can use both.
+
+### The three points the page must make clear (Charles, 2026-10-24)
+
+Each one shows up in the hero or right below it, in the story, and in its own section. Charles's own words:
+
+1. **A supplement to Rectangle.** "It does things I wish Rectangle did, and skips the parts of Rectangle that I didn't personally use." It's not a replacement and not a rival.
+2. **Lots of windows from the same app.** "I always have multiple windows of Chrome, or VS Code, open at once, and I needed a quick way to organize and move them." That means resize, maximize, center or move one window, all of an app's windows, or everything.
+3. **Several different monitor setups.** "Moving across multiple different multi-monitor setups would force me to manually move them around to my preferred location, often when Mac would fail to remember this." Window Shepherd remembers each setup and puts every window back.
+
+### Headline
+
+Chosen by Charles (2026-10-24) and now in the hero above: **"Quickly tidy your app windows, move them between screens, and put it all back the way it was."** It covers points 2 and 3. The earlier candidates can serve as section headers:
+
+- Your windows, back where they were.
+- Unplug, replug, and everything's back where it was.
+- For people with lots of windows and more than one screen.
 
 ### What the page is built on (two moments, and one idea that ties them together)
 
@@ -68,7 +81,7 @@ Write to these people; don't name them as personas on the page.
 
 Who it's probably **not** for. Say this kindly, in the FAQ:
 
-- Fine-grained tiling (thirds, sixths, ninths), drag-to-snap, ultrawide layouts: Rectangle is better.
+- Fine-grained tiling (thirds, sixths, ninths), drag-to-snap, ultrawide layouts: Rectangle is where those features live.
 - Named layouts you switch between, or layouts that launch apps: Rectangle Pro, Moom and Stay do that.
 - Restoring windows after a restart.
 
@@ -78,7 +91,7 @@ Who it's probably **not** for. Say this kindly, in the FAQ:
 
 Agreed direction from the reviews: show the proof before the person, and keep the page short. The README holds the detail.
 
-1. **Hero:** headline, subhead, the "no shortcuts needed" line, the replug clip (must-have, see 10), and the button.
+1. **Hero:** headline, subhead, the "no shortcuts needed" line, the supplement-to-Rectangle line, the replug clip (must-have, see 10), and the button.
 2. **The replug (two desks):** 3–4 short lines plus the honest macOS line.
 3. **One window, a whole app, or everything:** tidy up in place (maximize, 90%, center, halves) and send to another screen, for one window, all of an app's windows, or everything. The four-step "more keys, more windows" ladder, and a mouse-first menu screenshot.
 4. **The story:** Charles's intro, about 90 words, with an optional photo.
@@ -102,7 +115,7 @@ The button says "Watch for the release on GitHub". Don't set up an email list: i
 
 > **Sit down, plug in, and everything's back.**
 >
-> I work at two desks with two different monitors. Window Shepherd keeps a separate arrangement for each one, and for the laptop on its own. When I plug in at either desk, my windows go back to how I left them there, and when I unplug, the laptop goes back to how I had it.
+> I move between a few different monitor setups, and my Mac would often forget where my windows went, so I'd end up moving them back to my preferred spots by hand. Window Shepherd keeps a separate arrangement for each setup, and for the laptop on its own. When I plug in, my windows go back to how I left them on that setup, and when I unplug, the laptop goes back to how I had it.
 >
 > - There's nothing to set up or save. It keeps track as you go.
 > - If you move a window while it's putting things back, it leaves that one alone.
@@ -113,13 +126,11 @@ The button says "Watch for the release on GitHub". Don't set up an email list: i
 >
 > The first time you connect a new monitor, there's nothing to remember yet, so you arrange things once. After that, it remembers.
 
-**[Charles?]** "I work at two desks with two different monitors": is this true for you? If not, rewrite it as "If you work at two desks…".
-
 ### 4.2 One window, a whole app, or everything
 
 > **Resize, maximize, center or move: one window, every window of an app, or everything.**
 >
-> When my windows drift into a mess, I can tidy them in one go. I make every Chrome window the same 90%, center them all, or maximize everything, each on the screen it's already on. And when I want them on another screen, it's the same idea: one window, a whole app, or everything.
+> I always have several Chrome windows and a few VS Code windows open at once, and I needed a quick way to organize and move them. Now I can make every Chrome window the same 90%, center them all, or maximize everything in one go, each on the screen it's already on. And when I want them on another screen, it's the same idea: one window, a whole app, or everything.
 >
 > ⌥⌘G puts this window at 90%.
 > Add ⌃ to do it for every window of the app: ⌃⌥⌘G.
@@ -130,17 +141,15 @@ The button says "Watch for the release on GitHub". Don't set up an email list: i
 
 The sizes are full screen, 90%, 60%, centered at the same size, the four halves and the four corners. Show one example of each "who" on the page, rather than the full grid of sizes times scopes.
 
-**[Charles?]** "When my windows drift into a mess…" is written as your habit. Keep it, or say "When windows drift into a mess…".
-
 Teach the symbols once, near the first one: "⌃ is Control, ⌥ is Option, ⌘ is Command, ⇧ is Shift."
 
 Screenshot: the menu, opened with the mouse, with the 90% submenu showing "This window / All Chrome windows / Everything".
 
 Optional, a short expandable "All the shortcuts" list (section 5.4), or a link to the README for it.
 
-### 4.3 The story (about 90 words) **[Charles?]**
+### 4.3 The story (about 120 words) **[Charles?]**
 
-> Hi, I'm Charles. I've used Rectangle for years and I love it. But I keep a lot of windows open, and I move between my laptop and a monitor many times a day. Every time I unplugged, everything piled onto the laptop, and plugging back in never quite put it all back. So I built something for myself, first as a small script and now as a proper Mac app. It isn't a replacement for Rectangle. It just fills a couple of gaps I kept running into, and I thought it might help someone else too.
+> Hi, I'm Charles. I've used Rectangle for years and I love it. But I always have several windows of the same app open, like Chrome or VS Code, and I needed a quick way to organize and move them together. I also move between a few different monitor setups, and my Mac would often forget where everything went, so I'd move it all back by hand. So I built something for myself, first as a small script and now as a proper Mac app. I think of it as a supplement to Rectangle: it does the things I wished Rectangle did, and skips the parts I didn't personally use. I thought it might help someone else too.
 
 Optional lines, each a separate choice for Charles:
 
@@ -161,9 +170,11 @@ Next to the download button, once released: "Signed and checked by Apple" (the p
 
 ### 4.5 Using it with Rectangle (prose, not a table)
 
-> **You can use both.** I'm a big fan of Rectangle, and if you mostly move one window at a time, it's probably all you need. Rectangle is the better pick for fine-grained tiling (thirds, sixths, ninths), drag-to-snap, and tiling a whole screen at once, and it's a mature app a great many people rely on.
+> **A supplement to Rectangle, not a replacement.** I'm a big fan of Rectangle. Window Shepherd does the things I wished Rectangle did (moving and tidying all of an app's windows at once, and remembering each monitor setup), and it skips the parts of Rectangle I didn't personally use.
 >
-> Window Shepherd might help if you keep several windows per app, move between screens often, and are tired of putting everything back by hand.
+> If you mostly move one window at a time, Rectangle is probably all you need. It's where to go for fine-grained tiling (thirds, sixths, ninths), drag-to-snap and tiling a whole screen at once, and it's a mature app a great many people rely on.
+>
+> Window Shepherd might help if you keep several windows per app, move between different monitor setups, and are tired of putting everything back by hand. **You can use both.**
 >
 > The two share only a couple of shortcuts. While Rectangle is running, Window Shepherd steps aside on those, tells you once which ones, and takes them back when Rectangle quits.
 >
@@ -480,16 +491,24 @@ Never claim to be the only one.
 
 ## 11. Decisions for Charles
 
-1. The headline (1).
-2. The story: approve the ~90-word version (4.3). Decide on the optional lines: the AI line, "used it every day since…", photo, link.
-3. "I work at two desks" (4.1): true for you, or rewrite it as "If you work at two desks".
-4. Intel support: build universal, or say Apple Silicon only.
-5. The bug-report channel: GitHub Issues only, or an email address too.
-6. Whether to show the shortcut table on the page (expandable) or only link to the README.
+Settled 2026-10-24: the headline (Charles's own), the "different monitor setups" wording (4.1), and the Chrome/VS Code line (4.2).
+
+1. The story: approve the rewritten version (4.3). Decide on the optional lines: the AI line, "used it every day since…", photo, link.
+2. Intel support: build universal, or say Apple Silicon only.
+3. The bug-report channel: GitHub Issues only, or an email address too.
+4. Whether to show the shortcut table on the page (expandable) or only link to the README.
 
 ---
 
 ## 12. Review log
+
+### Draft 2.1 → 2.2 (Charles, 2026-10-24)
+
+- Charles's three points are now explicit (1) and carried into the hero, story, 4.1, 4.2 and 4.5:
+  - a supplement to Rectangle (it does what he wished Rectangle did, and skips what he didn't use)
+  - many Chrome or VS Code windows that need organizing and moving together
+  - several different monitor setups that macOS often failed to remember
+- Charles's own headline is adopted. A small typo in his "who it's not for" line is fixed.
 
 ### Draft 2 → 2.1 (Charles, 2026-10-24)
 
