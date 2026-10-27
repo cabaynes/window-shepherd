@@ -19,6 +19,17 @@ final class LayoutBookTests: XCTestCase {
         return b
     }
 
+    func testForgetClosedDropsOnlyClosedWindowsOfRunningApps() {
+        let b = book()
+        let u = UnitRect(x: 0, y: 0, w: 1, h: 1)
+        b.layouts[key] = ["1": LayoutEntry(pid: 10, app: "Chrome", scr: "UUID-2", unit: u, seen: 0),   // closed
+                          "2": LayoutEntry(pid: 10, app: "Chrome", scr: "UUID-2", unit: u, seen: 0),   // other Space: exists
+                          "3": LayoutEntry(pid: 30, app: "Quit", scr: "UUID-2", unit: u, seen: 0)]     // app not running: restorePlan's job
+        XCTAssertTrue(b.forgetClosed(existing: [2], running: [10]))
+        XCTAssertEqual(Set(b.layouts[key]!.keys), ["2", "3"])
+        XCTAssertFalse(b.forgetClosed(existing: [2], running: [10]), "nothing more to drop")
+    }
+
     func testRecordsOnlyAfterTwoSightings() {
         let b = book()
         XCTAssertFalse(b.snapshot(key: key, windows: [win(1, x: 1100)], screens: [lap, dell], now: 1))

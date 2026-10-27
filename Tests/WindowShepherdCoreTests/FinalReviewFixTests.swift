@@ -69,13 +69,13 @@ final class FinalReviewFixTests: XCTestCase {
         await waitUntil { !s.isBusy }
         // Replug while window 2 sits on another Space (not listed anywhere).
         let hidden = sys.locked { sys.windows.first { $0.id == 2 }! }
-        sys.locked { sys.windows.removeAll { $0.id == 2 } }
+        sys.locked { sys.windows.removeAll { $0.id == 2 }; sys.offSpace = [2] }
         sys.allScreens = [lap, dell]
         s.tick()
         await waitUntil { !s.isBusy }
         XCTAssertEqual(sys.setCount(2), 0)
         // You switch to that Space: window 2 shows up where macOS dumped it.
-        sys.locked { sys.windows.append(hidden) }
+        sys.locked { sys.windows.append(hidden); sys.offSpace = [] }
         s.tick(); s.tick()
         await waitUntil { self.sys.setCount(2) == 1 }
         await waitUntil { !s.isBusy }

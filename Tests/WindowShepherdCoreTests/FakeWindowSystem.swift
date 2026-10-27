@@ -44,6 +44,7 @@ final class FakeWindowSystem: WindowSystem {
     var framesSet: [(UInt32, CGRect)] = []
     var activated: [pid_t] = []
     var listCalls: [pid_t: Int] = [:]
+    var offSpace: Set<UInt32> = []               // exist (another Space, minimized) but aren't on screen
 
     var windowsByID: [UInt32: CGWindow] { Dictionary(uniqueKeysWithValues: windows.map { ($0.id, $0) }) }
 
@@ -59,6 +60,7 @@ final class FakeWindowSystem: WindowSystem {
 
     // MARK: WindowSystem
     func visibleWindows() -> [CGWindow] { locked { windows } }
+    func allWindowIDs() -> Set<UInt32> { locked { Set(windows.map(\.id)).union(offSpace) } }
     func screens() -> [ScreenInfo] { locked { allScreens } }
     func mainScreen() -> ScreenInfo? { locked { main ?? allScreens.first } }
     func frontmostPID() -> pid_t? { locked { front } }

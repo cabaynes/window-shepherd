@@ -60,7 +60,10 @@ extension Shepherd {
                 return
             }
             let changed = book.snapshot(key: key, windows: system.visibleWindows(), screens: screens, now: nowSeconds)
-            if changed || Date().timeIntervalSince1970 - store.lastSaved > 600 { store.save(book.layouts) }
+            if changed || Date().timeIntervalSince1970 - store.lastSaved > 600 {
+                book.forgetClosed(existing: system.allWindowIDs(), running: Set(system.runningApps().keys))
+                store.save(book.layouts)
+            }
         }
     }
 
@@ -98,6 +101,7 @@ extension Shepherd {
             return
         }
         let running = Set(system.runningApps().keys)
+        if book.forgetClosed(existing: system.allWindowIDs(), running: running) { store.save(book.layouts) }
         let plan = book.restorePlan(key: key, windows: system.visibleWindows(), screens: screens, running: running)
         Log.info("restore plan: \(book.planCounts.summary)")
         guard let plan, !plan.isEmpty else {

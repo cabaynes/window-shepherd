@@ -104,6 +104,25 @@ final class ShepherdRestoreTests: XCTestCase {
         XCTAssertEqual(sys.frameOf(2)?.minX ?? 0, 1300, accuracy: 2, "the restore finished after the move")
     }
 
+    func testRestorePlanForgetsClosedButKeepsOffSpaceWindows() async {
+        sys.addApp(10, "Safari", windows: [(1, rect(1100)), (2, rect(1300)), (3, rect(1500))])
+        let s = make()
+        s.tick()   // second sighting: all three recorded
+        sys.allScreens = [lap]
+        sys.locked {
+            sys.windows.removeAll { $0.id != 1 }   // 2 closed; 3 moved to another Space
+            sys.offSpace = [3]
+        }
+        move(1, to: rect(50))
+        s.screensChanged()
+        await waitUntil { !s.isBusy }
+        sys.allScreens = [lap, dell]
+        s.tick()
+        await waitUntil { !s.isBusy }
+        XCTAssertEqual(s.book.planCounts.remembered, 2, "window 2 is forgotten, window 3 is kept")
+        XCTAssertNil(s.book.layouts[Screens.setupKey([lap, dell])]?["2"])
+    }
+
     func testUserMoveDuringPassesIsNotUndone() async {
         let s = await rememberedThenUnplugged()
         sys.allScreens = [lap, dell]

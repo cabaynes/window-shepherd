@@ -70,6 +70,19 @@ public final class LayoutBook {
         }
     }
 
+    /// Drop remembered windows that have closed while their app kept running
+    /// (`existing` = every window that exists, any Space). Quit apps' entries
+    /// are left for `restorePlan`/`prune`. Returns true if anything was dropped.
+    @discardableResult
+    public func forgetClosed(existing: Set<UInt32>, running: Set<pid_t>) -> Bool {
+        var dropped = false
+        for (key, layout) in layouts {
+            let kept = layout.filter { id, e in !running.contains(e.pid) || UInt32(id).map(existing.contains) ?? false }
+            if kept.count != layout.count { layouts[key] = kept; dropped = true }
+        }
+        return dropped
+    }
+
     /// Record where windows are. A spot counts only when seen twice in a row
     /// (2 s apart), so a check that lands mid-unplug, after macOS shoved
     /// windows aside, can't overwrite the layout. Returns true if it changed.
