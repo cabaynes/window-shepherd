@@ -227,8 +227,10 @@ Checked against `main` at 9191ace and the parity checklist (all 37 lines live-te
   - **Menu moves** and **bulk moves** show "Moved N windows → …" (`Shepherd.swift:208`).
 - **A frozen or busy app:**
   - Every question to an app gives up after **0.5 s** (`LiveWindowSystem.swift:10`).
-  - If one window takes over **1.5 s**, or the app can't list its windows, it's tried again **2 s and 4 s** later. If it still fails, it's skipped and named in the message.
-  - For **2 minutes** the menu offers "Retry N windows that didn't move" (`RetryOffer.swift:13`).
+  - If one window takes over **1.5 s**, the app can't list its windows, or it refuses a move, it's tried again with growing waits (2 s, 4 s, 8 s…, up to 16 s apart) for up to **60 s** after a screen change, or **30 s** for a move you asked for (`RestoreTiming.patience`, `MoveTiming.movePatience`). If it still fails, it's skipped and named in the message.
+  - Until your next move or screen change, the menu offers "Retry N windows that didn't move" (`RetryOffer.swift`).
+  - After a restore that left windows behind, the ⧉ flashes until you open the menu, and the menu's top row offers **Revert <screens>** to the frozen copy taken when you last unplugged (`Shepherd+Revert.swift`).
+  - Windows opened while undocked go to the biggest screen at 90% when you plug in, by default (`UndockedWindows.swift`).
 - It can't pick out *some* of an app's windows (one Chrome project): it moves all of an app's windows, or one window.
 
 ### 5.3 Screens and numbers
@@ -571,8 +573,10 @@ Settled 2026-10-24: the headline (Charles's own), the "different monitor setups"
 | Seen twice, 2 s apart | `LayoutBook.swift:61-63` |
 | 30 days | `LayoutBook.swift:28` |
 | 0.5 s per question | `LiveWindowSystem.swift:10` |
-| Retries 2 s and 4 s; 1.5 s window limit | `MoveStep.swift:31,35` |
-| Retry offer 2 minutes | `RetryOffer.swift:13` |
+| Retries with growing waits for 60 s (restore) / 30 s (move); 1.5 s window limit | `MoveStep.swift`, `Shepherd.swift` (`RestoreTiming.patience`) |
+| Retry offer until the next move or screen change | `Shepherd.swift` (`apply`, `retryRows`) |
+| Revert: frozen copy taken at unplug; kept if the setup was used under 60 s or windows were left behind | `LayoutBook.swift` (`setupChanged`) |
+| Windows opened while undocked: on, biggest screen, 90% centered | `UndockedWindows.swift` |
 | 429 app shortcuts + 47 system names | `known-shortcuts.json` |
 | 2 / 12 shared keys with Rectangle Recommended / Spectacle | `BackgroundShortcuts.swift`, live log 2026-10-23 |
 | Whole-app moves activate the app; everything doesn't | `Shepherd.swift:114-116` |
