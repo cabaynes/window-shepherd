@@ -76,6 +76,11 @@ struct SettingsView: View {
                             intro: "Hold \(symbols(vm.screenBase)) and press a screen's number. 1 is the laptop; monitors are numbered left to right.") {
                         screenKeys(vm, screens: model.screens)
                     }
+                    section("Windows opened while undocked",
+                            intro: "When you plug in a screen, windows you opened without it go here. "
+                                 + "Windows that already have a place go back to it.") {
+                        undockedControls()
+                    }
                     section("Open the menu") { rows([vm.menu]) }
                 }
                 .padding(.horizontal, 20)
@@ -377,6 +382,34 @@ struct SettingsView: View {
 
     /// The screens connected now, then each screen key written out for every one
     /// of them (at least screens 1 and 2, so a single screen still shows how it works).
+    private func undockedControls() -> some View {
+        let u = model.undocked
+        func set(_ change: (inout UndockedWindows) -> Void) {
+            var next = model.undocked
+            change(&next)
+            model.setUndocked(next)
+        }
+        return VStack(alignment: .leading, spacing: 8) {
+            Toggle("Move them when a screen is plugged in", isOn: Binding(get: { u.enabled }, set: { v in set { $0.enabled = v } }))
+            Picker("Screen", selection: Binding(get: { u.target }, set: { v in set { $0.target = v } })) {
+                Text("The biggest screen").tag(UndockedWindows.Target.biggest)
+                ForEach(model.screens, id: \.num) { d in
+                    Text(d.screen.name).tag(UndockedWindows.Target.named(uuid: d.screen.uuid, name: d.screen.name))
+                }
+                if case let .named(uuid, name) = u.target, !model.screens.contains(where: { $0.screen.uuid == uuid }) {
+                    Text("\(name) (not connected)").tag(u.target)
+                }
+            }
+            .frame(maxWidth: 360)
+            Picker("Size", selection: Binding(get: { u.size }, set: { v in set { $0.size = v } })) {
+                ForEach(UndockedWindows.Size.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+            }
+            .frame(maxWidth: 360)
+        }
+        .foregroundStyle(.primary)
+        .padding(.vertical, 8)
+    }
+
     private func screenKeys(_ vm: SettingsVM, screens: [Destination]) -> some View {
         let shown = Array(vm.screenKeys.prefix(max(2, min(screens.count, vm.screenKeys.count))))
         let scopes = shown.first?.map(\.label) ?? []

@@ -63,6 +63,9 @@ public final class Shepherd {
     var snapInFlight = Set<pid_t>()
     var snapPending: [pid_t: @MainActor () async -> Void] = [:]
 
+    /// Where windows opened while a screen was unplugged go when it's back.
+    public var undocked = UndockedWindows.defaults
+
     /// True while Accessibility is missing: the tick does nothing.
     public var paused = false
 

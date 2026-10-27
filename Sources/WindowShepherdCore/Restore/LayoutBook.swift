@@ -22,6 +22,8 @@ public struct RestoreTarget: Equatable {
     public let unit: UnitRect
     /// Where it is now (macOS's spot), protected if the move fails.
     public let from: Spot?
+    /// Centre it at its own size on the screen instead of using `unit`.
+    public var keepSize = false
 }
 
 /// What the last restore plan made of each remembered window, for the log.
@@ -72,6 +74,9 @@ public final class LayoutBook {
     /// Visible windows a restore wanted to move but couldn't, until they reach
     /// their spot, close, or you move them yourself.
     public var leftBehind = Set<String>()
+    /// Windows open at the last screen change that added a screen, with no
+    /// spot remembered for the new combination: the undocked setting places them.
+    public var homeless = Set<String>()
     /// A combination must be in use this long before leaving it replaces its frozen copy.
     public var minActiveToFreeze: Double = 60
 
@@ -184,6 +189,7 @@ public final class LayoutBook {
             }
         }
         leftBehind = []
+        homeless = []
         lastSetup = key
         lastSeenAt = [:]
         restoredIds = []
