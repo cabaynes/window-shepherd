@@ -74,6 +74,8 @@ public final class LayoutBook {
     /// Visible windows a restore wanted to move but couldn't, until they reach
     /// their spot, close, or you move them yourself.
     public var leftBehind = Set<String>()
+    /// Windows on screen at the last settled tick (the freeze rule counts only visible left-behind windows).
+    public var visibleAtLastTick = Set<String>()
     /// Windows open at the last screen change that added a screen, with no
     /// spot remembered for the new combination: the undocked setting places them.
     public var homeless = Set<String>()
@@ -95,6 +97,7 @@ public final class LayoutBook {
     /// are left for `restorePlan`/`prune`. Returns true if anything was dropped.
     @discardableResult
     public func forgetClosed(existing: Set<UInt32>, running: Set<pid_t>) -> Bool {
+        guard !existing.isEmpty else { return false }   // the window list couldn't be read: forget nothing
         var dropped = false
         for (key, layout) in layouts {
             let kept = layout.filter { id, e in !running.contains(e.pid) || UInt32(id).map(existing.contains) ?? false }
@@ -177,18 +180,20 @@ public final class LayoutBook {
         windows.filter { leftBehind.contains(String($0.id)) }.count
     }
 
-    /// Leaving a combination in good order (in use a minute, nothing left
-    /// behind) freezes its layout; otherwise its live layout goes back to the
-    /// last frozen copy, so a stranded spot never becomes a window's home.
+    /// Leaving a combination in good order (in use a minute, no left-behind
+    /// window on screen) freezes its layout; otherwise the frozen copy's
+    /// windows go back to their frozen spots, so a stranded spot never becomes
+    /// a window's home (windows opened since keep theirs).
     public func setupChanged(to key: String, now: Double) {
         if let old = lastSetup, old != key {
-            if now - changedAt >= minActiveToFreeze && leftBehind.isEmpty {
+            if now - changedAt >= minActiveToFreeze && leftBehind.isDisjoint(with: visibleAtLastTick) {
                 frozen[old] = FrozenCopy(layout: layouts[old] ?? [:], at: now)
             } else if let f = frozen[old] {
-                layouts[old] = f.layout
+                layouts[old, default: [:]].merge(f.layout) { _, frozen in frozen }
             }
         }
         leftBehind = []
+        visibleAtLastTick = []
         homeless = []
         lastSetup = key
         lastSeenAt = [:]

@@ -86,6 +86,14 @@ final class UndockedTests: XCTestCase {
         XCTAssertEqual(sys.frameOf(7), Geometry.centered(CGSize(width: 400, height: 300), in: dell.frame))
     }
 
+    func testKeepSizeWithUnreadableFrameDoesNotShrink() async {
+        _ = await openedWhileUndocked { s in
+            s.undocked.size = .keep
+            self.sys.noFrame = [7]
+        }
+        XCTAssertEqual(sys.frameOf(7), rect(40))
+    }
+
     func testOnlyWhenAScreenIsAdded() async {
         sys.addApp(10, "Safari", windows: [(1, rect(1100))])
         let s = make()

@@ -44,10 +44,36 @@ final class LayoutBookTests: XCTestCase {
         b.frozen[key] = FrozenCopy(layout: ["1": entry(scr: "UUID-2")], at: -10)
         b.layouts[key] = ["1": entry(scr: "UUID-1")]
         b.leftBehind = ["1"]
+        b.visibleAtLastTick = ["1"]
         b.setupChanged(to: "OTHER", now: 300)
         XCTAssertEqual(b.frozen[key]?.at, -10)
         XCTAssertEqual(b.layouts[key]?["1"]?.scr, "UUID-2")
         XCTAssertTrue(b.leftBehind.isEmpty, "a new setup starts clean")
+    }
+
+    func testOffScreenLeftBehindDoesNotBlockFreeze() {
+        let b = book(); b.changedAt = 0
+        b.layouts[key] = ["1": entry(scr: "UUID-2")]
+        b.leftBehind = ["1"]
+        b.visibleAtLastTick = []                              // on another Space, not on screen
+        b.setupChanged(to: "OTHER", now: 300)
+        XCTAssertEqual(b.frozen[key]?.at, 300)
+    }
+
+    func testRollbackKeepsWindowsOpenedDuringTheVisit() {
+        let b = book(); b.changedAt = 100
+        b.frozen[key] = FrozenCopy(layout: ["1": entry(scr: "UUID-2")], at: 50)
+        b.layouts[key] = ["1": entry(scr: "UUID-1"), "5": entry(scr: "UUID-2")]
+        b.setupChanged(to: "OTHER", now: 102)
+        XCTAssertEqual(b.layouts[key]?["1"]?.scr, "UUID-2", "the stranded spot is dropped")
+        XCTAssertEqual(b.layouts[key]?["5"]?.scr, "UUID-2", "a window opened during the visit keeps its home")
+    }
+
+    func testForgetClosedWithAnEmptyListDropsNothing() {
+        let b = book()
+        b.layouts[key] = ["1": entry(scr: "UUID-2")]
+        XCTAssertFalse(b.forgetClosed(existing: [], running: [10]), "an empty list means the read failed")
+        XCTAssertNotNil(b.layouts[key]?["1"])
     }
 
     func testFlickerWithNoFrozenCopyKeepsLive() {

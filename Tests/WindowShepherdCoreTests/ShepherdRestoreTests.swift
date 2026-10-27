@@ -206,6 +206,44 @@ final class ShepherdRestoreTests: XCTestCase {
         XCTAssertNil(s.revertInfo())
     }
 
+    func testDragDuringPatientRestoreIsNotUndone() async {
+        sys.addApp(10, "Safari", windows: [(1, rect(1100)), (2, rect(1300))])
+        let s = make(passes: [0.05], patience: 2)
+        s.tick()
+        sys.allScreens = [lap]
+        move(1, to: rect(50)); move(2, to: rect(80))
+        s.screensChanged()
+        await waitUntil { !s.isBusy }
+        sys.listBehaviour[10] = .throwTimes(sys.listCalls[10, default: 0] + 3)   // answers on the 4th try
+        sys.allScreens = [lap, dell]
+        s.tick()
+        try? await Task.sleep(nanoseconds: 120_000_000)
+        move(1, to: rect(600))                       // you drag it while the restore waits for Safari
+        await waitUntil(4) { !s.isBusy }
+        XCTAssertEqual(sys.frameOf(1), rect(600), "yours now")
+        XCTAssertEqual(sys.frameOf(2)?.minX ?? 0, 1300, accuracy: 0.5)
+    }
+
+    func testPatientRestoreAbsorbsTheLaterPasses() async {
+        let s = await rememberedThenUnplugged()      // passes 0.05 / 0.15 / 0.3, patience 0.5
+        sys.listBehaviour[10] = .throwAlways
+        let before = sys.listCalls[10, default: 0]
+        sys.allScreens = [lap, dell]
+        s.tick()
+        await waitUntil(4) { !s.isBusy }
+        XCTAssertLessThanOrEqual(sys.listCalls[10, default: 0] - before, 5, "no extra passes after the patient one")
+        XCTAssertTrue(s.flashing)
+    }
+
+    func testScreenChangeClearsResumeRestore() async {
+        sys.addApp(10, "Safari", windows: [(1, rect(1100))])
+        let s = make()
+        s.resumeRestore = true
+        sys.allScreens = [lap]
+        s.tick()
+        XCTAssertFalse(s.resumeRestore)
+    }
+
     func testUserMoveDuringPassesIsNotUndone() async {
         let s = await rememberedThenUnplugged()
         sys.allScreens = [lap, dell]

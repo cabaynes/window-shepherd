@@ -47,6 +47,7 @@ extension Shepherd {
             store.save(book.layouts)
             retryOffer = nil   // its targets were for the old setup
             setFlashing(false)
+            resumeRestore = false   // that restore was for the old setup
             if let job = runner.current {   // it was moving/restoring for the old setup: stop it
                 Log.info("stopped a \(job.kind.rawValue) that was running for the previous screen setup")
                 runner.stopCurrent(reportAs: nil)
@@ -69,6 +70,7 @@ extension Shepherd {
                 return
             }
             let visible = system.visibleWindows()
+            book.visibleAtLastTick = Set(visible.map { String($0.id) })
             if !book.leftBehind.isEmpty {
                 book.resolve(windows: visible, screens: screens, existing: system.allWindowIDs())
             }
@@ -147,17 +149,34 @@ extension Shepherd {
         // Patience runs from the screen change, so a resumed or late pass gets only what's left.
         let remaining = patience ?? (book.changedAt + restoreTiming.patience - nowSeconds)
         let patientUntil = remaining > 0 ? Date().addingTimeInterval(remaining) : nil
+        // A patient job does the later passes' work itself: drop them, or they'd run after it, past the budget.
+        if patientUntil != nil { cancelRestores() }
         let steps: [JobStep] = plan.keys.sorted().map { pid in
             appStep(pid: pid, wanted: plan[pid]!, system: system, worker: jobWorker, timing: timing, tally: tally,
                     patientUntil: patientUntil,
                     gate: { [weak self] in self?.book.lastSetup == key },
                     // You placed it while this job ran (a snap): it's yours now.
-                    skip: { [weak self] id in self?.book.restoredIds.contains(String(id)) ?? true },
+                    skip: { [weak self] id in
+                        guard let self else { return true }
+                        if self.book.restoredIds.contains(String(id)) { return true }
+                        // Dragged since the plan was made (no snapshot runs during a job): yours now.
+                        guard let from = plan[pid]?[id]?.from,
+                              let w = self.system.visibleWindows().first(where: { $0.id == id }),
+                              !Geometry.sameSpot(Geometry.whereIs(w.frame, in: screens), from) else { return false }
+                        self.book.restoredIds.insert(String(id))
+                        self.book.protect[String(id)] = nil
+                        self.book.markYours(String(id))
+                        return true
+                    },
                     action: { win, t in
                         let placer = t.keepSize ? Placer.center(.fixed(uuid: t.screenUUID))
                                                 : Placer.unit(t.unit, .fixed(uuid: t.screenUUID), fitInside: true)
                         // A fixed-screen unit needs no frame from the app; centring keeps the window's size.
-                        let current = t.keepSize ? (win.frame() ?? .zero) : .zero
+                        var current = CGRect.zero
+                        if t.keepSize {   // no size to keep if the app didn't answer: retry, never shrink it
+                            guard let f = win.frame() else { throw AXFailure(code: -25200) }
+                            current = f
+                        }
                         guard let r = placer.frame(for: current, screens: screens, main: main) else {
                             throw AXFailure(code: -25200)
                         }
