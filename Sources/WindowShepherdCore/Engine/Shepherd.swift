@@ -104,6 +104,7 @@ public final class Shepherd {
         let screens = system.screens()
         let main = system.mainScreen()
         let tally = Tally<Bool>()
+        if !sel.retry { retryOffer = nil }   // a new move replaces the old offer
 
         func finish(_ problem: JobProblem?) {
             tally.settle()
@@ -288,12 +289,9 @@ public final class Shepherd {
     }
 
     /// The retry offer's rows (sorted "App — Title"), or nil when there is
-    /// none: expired, or every window it lists has closed.
+    /// none, or every window it lists has closed.
     public func retryRows() -> (count: Int, titles: [String])? {
-        guard let offer = retryOffer, now().timeIntervalSince(offer.at) <= retryFor else {
-            retryOffer = nil
-            return nil
-        }
+        guard let offer = retryOffer else { return nil }
         var titles: [String] = []
         for w in system.visibleWindows() where offer.missed[w.pid]?.contains(w.id) == true {
             titles.append(retryTitle(app: w.app, title: w.title))
