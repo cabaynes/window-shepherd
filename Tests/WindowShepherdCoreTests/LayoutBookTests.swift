@@ -19,6 +19,77 @@ final class LayoutBookTests: XCTestCase {
         return b
     }
 
+    func entry(scr: String) -> LayoutEntry {
+        LayoutEntry(pid: 10, app: "Safari", scr: scr, unit: UnitRect(x: 0, y: 0, w: 0.5, h: 0.5), seen: 0)
+    }
+
+    func testDepartureFreezesAfterAMinute() {
+        let b = book(); b.changedAt = 0
+        b.layouts[key] = ["1": entry(scr: "UUID-2")]
+        b.setupChanged(to: "OTHER", now: 61)
+        XCTAssertEqual(b.frozen[key], FrozenCopy(layout: ["1": entry(scr: "UUID-2")], at: 61))
+    }
+
+    func testFlickerKeepsFrozenCopy() {
+        let b = book(); b.changedAt = 100
+        b.frozen[key] = FrozenCopy(layout: ["1": entry(scr: "UUID-2")], at: 50)
+        b.layouts[key] = ["1": entry(scr: "UUID-1")]          // picked up a stranded spot
+        b.setupChanged(to: "OTHER", now: 102)                 // active 2 s
+        XCTAssertEqual(b.frozen[key]?.at, 50)
+        XCTAssertEqual(b.layouts[key]?["1"]?.scr, "UUID-2", "live rolled back to the frozen copy")
+    }
+
+    func testUnresolvedLeftBehindKeepsFrozenCopy() {
+        let b = book(); b.changedAt = 0
+        b.frozen[key] = FrozenCopy(layout: ["1": entry(scr: "UUID-2")], at: -10)
+        b.layouts[key] = ["1": entry(scr: "UUID-1")]
+        b.leftBehind = ["1"]
+        b.setupChanged(to: "OTHER", now: 300)
+        XCTAssertEqual(b.frozen[key]?.at, -10)
+        XCTAssertEqual(b.layouts[key]?["1"]?.scr, "UUID-2")
+        XCTAssertTrue(b.leftBehind.isEmpty, "a new setup starts clean")
+    }
+
+    func testFlickerWithNoFrozenCopyKeepsLive() {
+        let b = book(); b.changedAt = 100
+        b.layouts[key] = ["1": entry(scr: "UUID-2")]
+        b.setupChanged(to: "OTHER", now: 101)
+        XCTAssertNil(b.frozen[key])
+        XCTAssertEqual(b.layouts[key]?["1"]?.scr, "UUID-2")
+    }
+
+    func testUserMoveResolvesLeftBehind() {
+        let b = book(); b.leftBehind = ["1"]
+        b.markYours("1")
+        XCTAssertTrue(b.leftBehind.isEmpty)
+    }
+
+    func testSnapshotSeeingYourDragResolvesLeftBehind() {
+        let b = book()
+        b.protect["1"] = Spot(scr: "UUID-1", unit: UnitRect(x: 0, y: 0, w: 0.5, h: 0.5))
+        b.leftBehind = ["1"]
+        b.snapshot(key: key, windows: [win(1, x: 500)], screens: [lap, dell], now: 1)
+        XCTAssertTrue(b.leftBehind.isEmpty)
+    }
+
+    func testResolveDropsArrivedAndClosed() {
+        let b = book()
+        let home = Geometry.whereIs(win(1, x: 1100).frame, in: [lap, dell])!
+        b.layouts[key] = ["1": LayoutEntry(pid: 10, app: "Safari", scr: home.scr, unit: home.unit, seen: 0)]
+        b.leftBehind = ["1", "2", "3"]
+        // 1 reached its spot; 2 closed; 3 is on another Space (exists, not visible): still left behind.
+        b.resolve(windows: [win(1, x: 1100)], screens: [lap, dell], existing: [1, 3])
+        XCTAssertEqual(b.leftBehind, ["3"])
+        XCTAssertEqual(b.unresolvedVisible([win(1, x: 1100)]), 0)
+    }
+
+    func testForgetClosedAlsoPrunesFrozen() {
+        let b = book()
+        b.frozen[key] = FrozenCopy(layout: ["1": entry(scr: "UUID-2"), "2": entry(scr: "UUID-2")], at: 0)
+        b.forgetClosed(existing: [2], running: [10])
+        XCTAssertEqual(Set(b.frozen[key]!.layout.keys), ["2"])
+    }
+
     func testForgetClosedDropsOnlyClosedWindowsOfRunningApps() {
         let b = book()
         let u = UnitRect(x: 0, y: 0, w: 1, h: 1)

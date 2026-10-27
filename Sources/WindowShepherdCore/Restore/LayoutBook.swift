@@ -34,6 +34,14 @@ public struct PlanCounts: Equatable {
     }
 }
 
+/// A screen combination's layout as it was when you last left it in good
+/// order: Revert's target, and what a bad visit's live layout is rolled back to.
+public struct FrozenCopy: Codable, Equatable {
+    public var layout: [String: LayoutEntry]
+    public var at: Double
+    public init(layout: [String: LayoutEntry], at: Double) { self.layout = layout; self.at = at }
+}
+
 /// Forget remembered windows not seen for this long.
 public let forgetAfter: Double = 30 * 86400
 
@@ -59,6 +67,13 @@ public final class LayoutBook {
     var lastSeenAt: [String: Spot] = [:]
     /// How the last `restorePlan` sorted the remembered windows.
     public private(set) var planCounts = PlanCounts()
+    /// setup key → its frozen copy, taken when you leave a combination.
+    public var frozen: [String: FrozenCopy] = [:]
+    /// Visible windows a restore wanted to move but couldn't, until they reach
+    /// their spot, close, or you move them yourself.
+    public var leftBehind = Set<String>()
+    /// A combination must be in use this long before leaving it replaces its frozen copy.
+    public var minActiveToFreeze: Double = 60
 
     public init(layouts: [String: [String: LayoutEntry]]) { self.layouts = layouts }
 
@@ -80,6 +95,10 @@ public final class LayoutBook {
             let kept = layout.filter { id, e in !running.contains(e.pid) || UInt32(id).map(existing.contains) ?? false }
             if kept.count != layout.count { layouts[key] = kept; dropped = true }
         }
+        for (key, copy) in frozen {
+            let kept = copy.layout.filter { id, e in !running.contains(e.pid) || UInt32(id).map(existing.contains) ?? false }
+            if kept.count != copy.layout.count { frozen[key]?.layout = kept; dropped = true }
+        }
         return dropped
     }
 
@@ -98,6 +117,7 @@ public final class LayoutBook {
             if let p = protect[id], !Geometry.sameSpot(spot, p) {   // you moved it: yours now, restore leaves it
                 protect[id] = nil
                 restoredIds.insert(id)
+                markYours(id)
             }
             layout[id]?.seen = now
             if Geometry.sameSpot(spot, lastSeenAt[id]) && protect[id] == nil && !offscreen.contains(id) {
@@ -125,11 +145,45 @@ public final class LayoutBook {
             let id = String(w.id)
             layout[id] = LayoutEntry(pid: w.pid, app: w.app, scr: spot.scr, unit: spot.unit, seen: now)
             protect[id] = nil
+            markYours(id)
         }
         layouts[key] = layout
     }
 
+    /// You placed this window yourself: it isn't stranded any more.
+    public func markYours(_ id: String) { leftBehind.remove(id) }
+
+    /// Drop left-behind windows that reached their live spot or closed
+    /// (`existing` = all windows on any Space). Cheap: no app calls.
+    public func resolve(windows: [CGWindow], screens: [ScreenInfo], existing: Set<UInt32>) {
+        guard !leftBehind.isEmpty, let key = lastSetup else { return }
+        let home = layouts[key] ?? [:]
+        for w in windows {
+            let id = String(w.id)
+            if leftBehind.contains(id), let e = home[id], Geometry.sameSpot(Geometry.whereIs(w.frame, in: screens), e.spot) {
+                leftBehind.remove(id)
+            }
+        }
+        leftBehind = leftBehind.filter { UInt32($0).map(existing.contains) ?? false }
+    }
+
+    /// How many left-behind windows are on screen now.
+    public func unresolvedVisible(_ windows: [CGWindow]) -> Int {
+        windows.filter { leftBehind.contains(String($0.id)) }.count
+    }
+
+    /// Leaving a combination in good order (in use a minute, nothing left
+    /// behind) freezes its layout; otherwise its live layout goes back to the
+    /// last frozen copy, so a stranded spot never becomes a window's home.
     public func setupChanged(to key: String, now: Double) {
+        if let old = lastSetup, old != key {
+            if now - changedAt >= minActiveToFreeze && leftBehind.isEmpty {
+                frozen[old] = FrozenCopy(layout: layouts[old] ?? [:], at: now)
+            } else if let f = frozen[old] {
+                layouts[old] = f.layout
+            }
+        }
+        leftBehind = []
         lastSetup = key
         lastSeenAt = [:]
         restoredIds = []
@@ -158,6 +212,7 @@ public final class LayoutBook {
             } else if let p = protect[id], let at = nowAt[id], !Geometry.sameSpot(at, p) {
                 restoredIds.insert(id)                 // an earlier pass missed it and you've since moved it
                 protect[id] = nil
+                markYours(id)
                 n.yours += 1
             } else if !connected.contains(e.scr) {
                 n.screenGone += 1
@@ -183,13 +238,16 @@ public final class LayoutBook {
 
     /// After a pass: windows it couldn't move are still where macOS left
     /// them; don't let a snapshot record that spot as their home.
-    public func restoreFinished(plan: [pid_t: [UInt32: RestoreTarget]]) {
+    /// `visible` = windows on screen now: those it couldn't move are left behind.
+    public func restoreFinished(plan: [pid_t: [UInt32: RestoreTarget]], visible: Set<String> = []) {
         for targets in plan.values {
             for t in targets.values {
                 if restoredIds.contains(t.id) {
                     offscreen.remove(t.id)
+                    leftBehind.remove(t.id)
                 } else if let from = t.from {
                     protect[t.id] = from
+                    if visible.contains(t.id) { leftBehind.insert(t.id) }
                 } else {
                     offscreen.insert(t.id)   // not on screen now: catch it when it appears
                 }

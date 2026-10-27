@@ -36,7 +36,10 @@ extension Shepherd {
         if key != book.lastSetup {
             let first = restoreTiming.passes.first ?? 0
             Log.info("screen setup is now \(Screens.setupLabel(screens)); \(book.layouts[key]?.count ?? 0) windows remembered for it, restoring in \(Int(first.rounded()))s")
-            book.setupChanged(to: key, now: nowSeconds)
+            book.setupChanged(to: key, now: nowSeconds)   // freezes the old combination, or rolls it back
+            lastChange = (key, nowSeconds)
+            frozenStore.save(FrozenState(copies: book.frozen, lastChangeKey: key, lastChangeAt: nowSeconds))
+            store.save(book.layouts)
             retryOffer = nil   // its targets were for the old setup
             if let job = runner.current {   // it was moving/restoring for the old setup: stop it
                 Log.info("stopped a \(job.kind.rawValue) that was running for the previous screen setup")
@@ -59,7 +62,11 @@ extension Shepherd {
                 restore()
                 return
             }
-            let changed = book.snapshot(key: key, windows: system.visibleWindows(), screens: screens, now: nowSeconds)
+            let visible = system.visibleWindows()
+            if !book.leftBehind.isEmpty {
+                book.resolve(windows: visible, screens: screens, existing: system.allWindowIDs())
+            }
+            let changed = book.snapshot(key: key, windows: visible, screens: screens, now: nowSeconds)
             if changed || Date().timeIntervalSince1970 - store.lastSaved > 600 {
                 book.forgetClosed(existing: system.allWindowIDs(), running: Set(system.runningApps().keys))
                 store.save(book.layouts)
@@ -139,7 +146,7 @@ extension Shepherd {
             if problem == .interrupted && self.book.lastSetup == key {
                 self.resumeRestore = true           // your move came first; the restore picks up after it
             }
-            self.book.restoreFinished(plan: plan)
+            self.book.restoreFinished(plan: plan, visible: Set(self.system.visibleWindows().map { String($0.id) }))
             self.book.settled = true                // snapshots may resume; missed windows stay protected
             if self.pendingPasses > 0 {             // the next pass retries skipped windows itself: don't announce them yet
                 tally.skipped = []

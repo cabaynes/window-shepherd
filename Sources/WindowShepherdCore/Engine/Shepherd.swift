@@ -33,6 +33,9 @@ public struct MenuContext: Equatable {
 public final class Shepherd {
     public let system: WindowSystem
     public let store: LayoutStore
+    public let frozenStore: FrozenStore
+    /// The last screen change (persisted): the Revert row is for that combination.
+    public internal(set) var lastChange: (key: String, at: Double)?
     public let book: LayoutBook
     let timing: MoveTiming
     var restoreTiming: RestoreTiming
@@ -60,10 +63,11 @@ public final class Shepherd {
     /// True while Accessibility is missing: the tick does nothing.
     public var paused = false
 
-    public init(system: WindowSystem, store: LayoutStore, timing: MoveTiming = .standard,
+    public init(system: WindowSystem, store: LayoutStore, frozenStore: FrozenStore? = nil, timing: MoveTiming = .standard,
                 restoreTiming: RestoreTiming = .standard, now: @escaping () -> Date = Date.init) {
         self.system = system
         self.store = store
+        self.frozenStore = frozenStore ?? FrozenStore(url: FrozenStore.url(beside: store.url))
         self.timing = timing
         self.restoreTiming = restoreTiming
         self.now = now
@@ -312,6 +316,9 @@ public final class Shepherd {
 
     /// At launch: no restore, just start remembering.
     public func start() {
+        let saved = frozenStore.load()
+        book.frozen = saved.copies
+        if let k = saved.lastChangeKey, let at = saved.lastChangeAt { lastChange = (k, at) }
         book.prune(running: system.runningApps())
         let key = Screens.setupKey(system.screens())
         book.lastSetup = key

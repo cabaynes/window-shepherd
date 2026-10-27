@@ -123,6 +123,25 @@ final class ShepherdRestoreTests: XCTestCase {
         XCTAssertNil(s.book.layouts[Screens.setupKey([lap, dell])]?["2"])
     }
 
+    func testFrozenCopySurvivesRestart() async {
+        let s = await rememberedThenUnplugged()
+        let dual = Screens.setupKey([lap, dell])
+        XCTAssertEqual(Set(s.book.frozen[dual]?.layout.keys ?? [:].keys), ["1", "2"])
+        s.frozenStore.flush()
+        let again = Shepherd(system: sys, store: store)
+        again.start()
+        XCTAssertEqual(again.book.frozen, s.book.frozen)
+    }
+
+    func testRestoreLeavesUnmovedVisibleWindowsLeftBehind() async {
+        let s = await rememberedThenUnplugged()
+        sys.failSet = [1]
+        sys.allScreens = [lap, dell]
+        s.tick()
+        await waitUntil(4) { !s.isBusy }
+        XCTAssertEqual(s.book.leftBehind, ["1"])
+    }
+
     func testUserMoveDuringPassesIsNotUndone() async {
         let s = await rememberedThenUnplugged()
         sys.allScreens = [lap, dell]
