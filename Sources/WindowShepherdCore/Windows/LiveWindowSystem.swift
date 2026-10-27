@@ -10,6 +10,13 @@ private func _AXUIElementGetWindow(_ element: AXUIElement, _ id: UnsafeMutablePo
 public let axTimeout: Float = 0.5
 
 final class AXWindow: WindowHandle {
+    /// Apps whose enhanced UI a move has switched off (logged once each).
+    nonisolated(unsafe) private static var flipped = Set<pid_t>()
+    private static let flippedLock = NSLock()
+    static func firstFlip(_ pid: pid_t) -> Bool {
+        flippedLock.lock(); defer { flippedLock.unlock() }
+        return flipped.insert(pid).inserted
+    }
     let element: AXUIElement
     init(_ e: AXUIElement) {
         element = e
@@ -41,6 +48,9 @@ final class AXWindow: WindowHandle {
         var ref: CFTypeRef?
         let wasOn = AXUIElementCopyAttributeValue(app, enhanced, &ref) == .success && (ref as? Bool) == true
         if wasOn { AXUIElementSetAttributeValue(app, enhanced, kCFBooleanFalse) }
+        if wasOn && Self.firstFlip(pid) {
+            Log.info("\(NSRunningApplication(processIdentifier: pid)?.localizedName ?? "pid \(pid)") has enhanced UI on: switching it off for each move")
+        }
         defer { if wasOn { AXUIElementSetAttributeValue(app, enhanced, kCFBooleanTrue) } }
         var err = AXError.success
         let moved = applyFrame(r,
