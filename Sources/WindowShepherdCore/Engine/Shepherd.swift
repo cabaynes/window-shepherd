@@ -49,6 +49,9 @@ public final class Shepherd {
     public var onBusyChanged: ((Bool) -> Void)?
     public internal(set) var isBusy = false
     public internal(set) var retryOffer: RetryOffer?
+    /// A restore left windows behind and you haven't opened the menu since.
+    public internal(set) var flashing = false
+    public var onFlashChanged: ((Bool) -> Void)?
 
     /// Restore passes scheduled but not yet run (they keep the icon red).
     var pendingPasses = 0

@@ -18,6 +18,8 @@ public enum MenuAction: Equatable {
     case moveTo(uuid: String, name: String, Placer, Selection, label: String)
     /// Retries the offer the menu showed (by its time), not whatever replaced it since.
     case retry(at: Date?)
+    /// Puts the current screens' frozen copy back.
+    case revert
     case customize, noop, launchAtLogin, about, checkForUpdates, quit, grantAccess
 }
 
@@ -32,6 +34,8 @@ public struct MenuInputs {
     public var retryAt: Date?
     /// How many of Window Shepherd's shortcuts Rectangle holds right now.
     public var rectangleShared = 0
+    /// The Revert row, when the current screens have a frozen copy.
+    public var revert: RevertInfo?
 
     public init(ctx: MenuContext, screens: [ScreenInfo], bindings: [ShortcutBinding], config: ShortcutConfig,
                 retry: (count: Int, titles: [String])?, launchAtLogin: Bool, needsAccess: Bool = false, retryAt: Date? = nil) {
@@ -57,12 +61,29 @@ public enum MenuModel {
         }
     }
 
+    /// "7:36 AM" today, "Oct 26, 7:36 AM" on another day (the user's locale).
+    public static func revertTime(_ at: Date, now: Date) -> String {
+        let f = DateFormatter()
+        f.setLocalizedDateFormatFromTemplate(Calendar.current.isDate(at, inSameDayAs: now) ? "jmm" : "MMMdjmm")
+        return f.string(from: at)
+    }
+
     /// Action first, then who: the actions, "Move to <screen>", then settings
     /// and the app's own items. The retry offer, when there is one, goes on top.
     public static func build(_ i: MenuInputs) -> [MenuNode] {
         var menu: [MenuNode] = []
         if i.needsAccess {
             menu += [.item(title: "Grant Accessibility permission…", keys: nil, action: .grantAccess), .separator]
+        }
+        if let r = i.revert {
+            let n = r.notWhere
+            menu.append(.item(title: "Revert " + r.label, keys: nil, action: .revert))
+            menu.append(.item(title: "to how it was at \(revertTime(r.at, now: Date())), before they were separated",
+                              keys: nil, action: .revert, indent: 1))
+            menu.append(.item(title: n == 0 ? "Every window is where it was then"
+                                : n == 1 ? "1 window isn't where it was then" : "\(n) windows aren't where they were then",
+                              keys: nil, action: .revert, indent: 1))
+            menu.append(.separator)
         }
         if let r = i.retry {
             menu.append(.item(title: "Retry \(r.count) window\(r.count == 1 ? "" : "s") that didn't move", keys: nil, action: .retry(at: i.retryAt)))

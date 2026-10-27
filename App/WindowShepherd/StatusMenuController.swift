@@ -21,6 +21,10 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
     private let menu = NSMenu()
     private let hooks: MenuHooks
     private var busyShown: Bool?
+    private var busy = false
+    /// Windows were left behind: blink red until the menu opens.
+    private var flashTimer: Timer?
+    private var flashRed = false
     /// Just built by popUpAtMouse to measure it: the delegate needn't build it again.
     private var builtForPopUp = false
 
@@ -36,11 +40,35 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
     }
 
     func setBusy(_ busy: Bool) {
-        guard busy != busyShown, let button = item.button else { return }
-        busyShown = busy
+        self.busy = busy
+        drawIcon()
+    }
+
+    /// Flashing: red and plain alternate every half second (steady red with
+    /// Reduce motion on). While busy, the steady busy red wins.
+    func setFlashing(_ on: Bool) {
+        flashTimer?.invalidate()
+        flashTimer = nil
+        flashRed = on
+        if on && !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
+            flashTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
+                MainActor.assumeIsolated {
+                    guard let self else { return }
+                    self.flashRed.toggle()
+                    self.drawIcon()
+                }
+            }
+        }
+        drawIcon()
+    }
+
+    private func drawIcon() {
+        let red = busy || flashRed
+        guard red != busyShown, let button = item.button else { return }
+        busyShown = red
         button.title = ""
         button.imagePosition = .imageOnly
-        button.image = MenuBarGlyph.image(busy: busy)
+        button.image = MenuBarGlyph.image(busy: red)
     }
 
     func updateTooltip() {
@@ -76,6 +104,7 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
                                 config: cfg, retry: s.retryRows(), launchAtLogin: hooks.launchAtLogin(),
                                 needsAccess: hooks.needsAccess(), retryAt: s.retryOffer?.at)
         inputs.rectangleShared = binder?.rectangleShared.count ?? 0
+        inputs.revert = s.revertInfo()
         render(MenuModel.build(inputs), into: menu)
         updateTooltip()
     }
@@ -90,7 +119,9 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
     private var mainMenuWindow: NSWindow?
 
     func menuWillOpen(_ menu: NSMenu) {
-        guard menu === self.menu, clickTap == nil else { return }
+        guard menu === self.menu else { return }
+        hooks.shepherd.menuOpened()
+        guard clickTap == nil else { return }
         let me = Unmanaged.passUnretained(self).toOpaque()
         guard let tap = CGEvent.tapCreate(tap: .cgSessionEventTap, place: .headInsertEventTap, options: .listenOnly,
                                           eventsOfInterest: CGEventMask(1 << CGEventType.leftMouseUp.rawValue),

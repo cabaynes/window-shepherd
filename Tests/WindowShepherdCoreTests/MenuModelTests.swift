@@ -17,6 +17,38 @@ final class MenuModelTests: XCTestCase {
                           retry: retry.map { (count: $0.0, titles: $0.1) }, launchAtLogin: true)
     }
 
+    func testRevertRowsOnTop() {
+        var i = inputs(retry: (1, ["Safari — Doc"]))
+        let at = Date()
+        i.revert = RevertInfo(label: "Built-in + DELL", at: at, notWhere: 32)
+        let m = MenuModel.build(i)
+        XCTAssertEqual(m[0], .item(title: "Revert Built-in + DELL", keys: nil, action: .revert))
+        XCTAssertEqual(m[1], .item(title: "to how it was at \(MenuModel.revertTime(at, now: at)), before they were separated",
+                                   keys: nil, action: .revert, indent: 1))
+        XCTAssertEqual(m[2], .item(title: "32 windows aren't where they were then", keys: nil, action: .revert, indent: 1))
+        XCTAssertEqual(m[3], .separator)
+        XCTAssertEqual(titles(m)[4], "Retry 1 window that didn't move")
+    }
+
+    func testRevertCountWording() {
+        var i = inputs()
+        i.revert = RevertInfo(label: "A + B", at: Date(), notWhere: 1)
+        XCTAssertEqual(titles(MenuModel.build(i))[2], "1 window isn't where it was then")
+        i.revert = RevertInfo(label: "A + B", at: Date(), notWhere: 0)
+        XCTAssertEqual(titles(MenuModel.build(i))[2], "Every window is where it was then")
+    }
+
+    func testNoRevertRowWithoutFrozenCopy() {
+        XCTAssertFalse(titles(MenuModel.build(inputs())).contains { $0.hasPrefix("Revert") })
+    }
+
+    func testRevertTimeShowsTheDayWhenNotToday() {
+        let now = Date()
+        let yesterday = now.addingTimeInterval(-86400)
+        XCTAssertNotEqual(MenuModel.revertTime(yesterday, now: now), MenuModel.revertTime(now, now: now))
+        XCTAssertFalse(MenuModel.revertTime(now, now: now).isEmpty)
+    }
+
     func titles(_ nodes: [MenuNode]) -> [String] {
         nodes.map {
             switch $0 {

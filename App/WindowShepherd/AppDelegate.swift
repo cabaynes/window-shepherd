@@ -38,6 +38,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         shepherd.onAlert = { HUD.show($0) }
         shepherd.onBusyChanged = { [weak self] in self?.statusMenu.setBusy($0) }
+        shepherd.onFlashChanged = { [weak self] in self?.statusMenu.setFlashing($0) }
         binder.onRectangleSharedChanged = { [weak self] in self?.rectangleNotice($0) }
 
         permission.onChange = { [weak self] trusted in self?.permissionChanged(trusted) }
@@ -191,6 +192,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             case nil: break
             }
         case .retry(let at): shepherd.runRetry(offerAt: at)
+        case .revert: shepherd.revert()
         case .customize:
             if settings == nil { settings = SettingsWindowController(target: binder) }
             settings?.show()

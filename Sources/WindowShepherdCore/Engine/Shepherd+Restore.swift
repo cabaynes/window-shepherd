@@ -41,6 +41,7 @@ extension Shepherd {
             frozenStore.save(FrozenState(copies: book.frozen, lastChangeKey: key, lastChangeAt: nowSeconds))
             store.save(book.layouts)
             retryOffer = nil   // its targets were for the old setup
+            setFlashing(false)
             if let job = runner.current {   // it was moving/restoring for the old setup: stop it
                 Log.info("stopped a \(job.kind.rawValue) that was running for the previous screen setup")
                 runner.stopCurrent(reportAs: nil)
@@ -66,6 +67,7 @@ extension Shepherd {
             if !book.leftBehind.isEmpty {
                 book.resolve(windows: visible, screens: screens, existing: system.allWindowIDs())
             }
+            if flashing && book.unresolvedVisible(visible) == 0 { setFlashing(false) }
             let changed = book.snapshot(key: key, windows: visible, screens: screens, now: nowSeconds)
             if changed || Date().timeIntervalSince1970 - store.lastSaved > 600 {
                 book.forgetClosed(existing: system.allWindowIDs(), running: Set(system.runningApps().keys))
@@ -99,7 +101,8 @@ extension Shepherd {
         updateBusy()
     }
 
-    func restore() {
+    /// `patience`: seconds to keep retrying from now; nil = what's left since the screen change.
+    func restore(patience: TimeInterval? = nil) {
         let screens = system.screens()
         let key = Screens.setupKey(screens)
         guard book.layouts[key] != nil else { book.settled = true; return }
@@ -119,7 +122,7 @@ extension Shepherd {
         let main = system.mainScreen()
         let tally = Tally<RestoreTarget>()
         // Patience runs from the screen change, so a resumed or late pass gets only what's left.
-        let remaining = book.changedAt + restoreTiming.patience - nowSeconds
+        let remaining = patience ?? (book.changedAt + restoreTiming.patience - nowSeconds)
         let patientUntil = remaining > 0 ? Date().addingTimeInterval(remaining) : nil
         let steps: [JobStep] = plan.keys.sorted().map { pid in
             appStep(pid: pid, wanted: plan[pid]!, system: system, worker: jobWorker, timing: timing, tally: tally,
@@ -146,7 +149,11 @@ extension Shepherd {
             if problem == .interrupted && self.book.lastSetup == key {
                 self.resumeRestore = true           // your move came first; the restore picks up after it
             }
-            self.book.restoreFinished(plan: plan, visible: Set(self.system.visibleWindows().map { String($0.id) }))
+            let visible = self.system.visibleWindows()
+            self.book.restoreFinished(plan: plan, visible: Set(visible.map { String($0.id) }))
+            if self.pendingPasses == 0 && problem != .interrupted && self.book.unresolvedVisible(visible) > 0 {
+                self.setFlashing(true)              // done trying, and some didn't make it
+            }
             self.book.settled = true                // snapshots may resume; missed windows stay protected
             if self.pendingPasses > 0 {             // the next pass retries skipped windows itself: don't announce them yet
                 tally.skipped = []

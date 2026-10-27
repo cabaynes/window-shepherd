@@ -142,6 +142,70 @@ final class ShepherdRestoreTests: XCTestCase {
         XCTAssertEqual(s.book.leftBehind, ["1"])
     }
 
+    func testLeftBehindFlashesUntilMenuOpens() async {
+        let s = await rememberedThenUnplugged()
+        var flashes: [Bool] = []
+        s.onFlashChanged = { flashes.append($0) }
+        sys.failSet = [1]
+        sys.allScreens = [lap, dell]
+        s.tick()
+        await waitUntil(4) { !s.isBusy }
+        XCTAssertTrue(s.flashing)
+        s.menuOpened()
+        XCTAssertFalse(s.flashing)
+        XCTAssertEqual(flashes, [true, false])
+    }
+
+    func testFlashStopsWhenLeftBehindResolves() async {
+        let s = await rememberedThenUnplugged()
+        sys.failSet = [1]
+        sys.allScreens = [lap, dell]
+        s.tick()
+        await waitUntil(4) { !s.isBusy }
+        XCTAssertTrue(s.flashing)
+        sys.failSet = []
+        s.apply(Selection(byPid: [10: [1]]), placer: .fraction(0.9, on: .fixed(uuid: dell.uuid)), label: "DELL (90%)")
+        await waitUntil(4) { !s.isBusy }
+        s.tick()
+        XCTAssertFalse(s.flashing, "you moved it yourself")
+    }
+
+    func testRevertPutsBackFrozenSpots() async {
+        let s = await rememberedThenUnplugged()
+        sys.allScreens = [lap, dell]
+        s.tick()
+        await waitUntil(4) { !s.isBusy }
+        XCTAssertEqual(sys.frameOf(1)?.minX ?? 0, 1100, accuracy: 0.5)
+        // You put window 1 on the built-in screen on purpose; later you want the old arrangement back.
+        s.apply(Selection(byPid: [10: [1]]), placer: .fraction(0.5, on: .fixed(uuid: lap.uuid)), label: "Built-in")
+        await waitUntil(4) { !s.isBusy }
+        XCTAssertEqual(s.revertInfo()?.notWhere, 1)
+        XCTAssertEqual(s.revertInfo()?.label, Screens.setupLabel([lap, dell]))
+        s.revert()
+        await waitUntil(4) { !s.isBusy }
+        XCTAssertEqual(sys.frameOf(1)?.minX ?? 0, 1100, accuracy: 0.5)
+        XCTAssertEqual(s.revertInfo()?.notWhere, 0)
+    }
+
+    func testRevertCancelsRunningRestore() async {
+        let s = await rememberedThenUnplugged()
+        sys.setDelay = [1: 0.3, 2: 0.3]
+        sys.allScreens = [lap, dell]
+        s.tick()
+        await waitUntil(2) { s.runner.current?.kind == .restore }
+        s.revert()
+        await waitUntil(6) { !s.isBusy }
+        XCTAssertEqual(sys.frameOf(1)?.minX ?? 0, 1100, accuracy: 0.5)
+        XCTAssertEqual(sys.frameOf(2)?.minX ?? 0, 1300, accuracy: 0.5)
+        XCTAssertFalse(alerts.contains { $0.contains("interrupted") }, "replaced quietly, not interrupted")
+    }
+
+    func testNoRevertWithoutFrozenCopy() {
+        sys.addApp(10, "Safari", windows: [(1, rect(1100))])
+        let s = make()
+        XCTAssertNil(s.revertInfo())
+    }
+
     func testUserMoveDuringPassesIsNotUndone() async {
         let s = await rememberedThenUnplugged()
         sys.allScreens = [lap, dell]
