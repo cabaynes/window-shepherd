@@ -30,6 +30,33 @@ final class MoveStepTests: XCTestCase {
         XCTAssertEqual(sys.frameOf(1), target)
     }
 
+    func testLogsWhyWantedWindowsDidNotMove() async throws {
+        let file = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".log")
+        let saved = Log.fileURL
+        Log.fileURL = file
+        defer { Log.fileURL = saved }
+        let sys = FakeWindowSystem()
+        sys.addApp(10, "Fake", windows: [(1, .zero), (2, .zero)])
+        sys.failSet = [2]
+        let (tally, _) = await run(sys, pid: 10, wanted: [1: true, 2: true, 3: true])   // 3 isn't in its list
+        XCTAssertEqual(tally.moved, 1)
+        Log.flush()
+        let log = try String(contentsOf: file, encoding: .utf8)
+        XCTAssertTrue(log.contains("Fake: 3 to move, 2 in its window list, 1 moved, 1 refused (AX -25200)"), log)
+    }
+
+    func testSilentWhenEverythingMoved() async throws {
+        let file = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".log")
+        let saved = Log.fileURL
+        Log.fileURL = file
+        defer { Log.fileURL = saved }
+        let sys = FakeWindowSystem()
+        sys.addApp(10, "Fake", windows: [(1, .zero)])
+        _ = await run(sys, pid: 10, wanted: [1: true])
+        Log.flush()
+        XCTAssertFalse(FileManager.default.fileExists(atPath: file.path))
+    }
+
     func testSlowListRetriesThenSkips() async {
         let sys = FakeWindowSystem()
         sys.addApp(10, "Fake", windows: [(1, .zero), (2, .zero)])

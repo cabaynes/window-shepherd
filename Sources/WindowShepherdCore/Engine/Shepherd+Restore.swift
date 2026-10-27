@@ -98,8 +98,9 @@ extension Shepherd {
             return
         }
         let running = Set(system.runningApps().keys)
-        guard let plan = book.restorePlan(key: key, windows: system.visibleWindows(), screens: screens, running: running),
-              !plan.isEmpty else {
+        let plan = book.restorePlan(key: key, windows: system.visibleWindows(), screens: screens, running: running)
+        Log.info("restore plan: \(book.planCounts.summary)")
+        guard let plan, !plan.isEmpty else {
             book.settled = true
             offerRetry(.restore, missed: [:]) { _ in }   // nothing left to put back
             return

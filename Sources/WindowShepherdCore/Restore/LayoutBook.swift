@@ -24,6 +24,16 @@ public struct RestoreTarget: Equatable {
     public let from: Spot?
 }
 
+/// What the last restore plan made of each remembered window, for the log.
+public struct PlanCounts: Equatable {
+    public var remembered = 0, toMove = 0, inPlace = 0, doneEarlier = 0, yours = 0, screenGone = 0, appQuit = 0
+
+    public var summary: String {
+        "\(remembered) remembered: \(toMove) to move, \(inPlace) already in place, \(doneEarlier) done earlier, "
+            + "\(yours) moved by you, \(screenGone) on a screen not connected, \(appQuit) from apps that quit"
+    }
+}
+
 /// Forget remembered windows not seen for this long.
 public let forgetAfter: Double = 30 * 86400
 
@@ -47,6 +57,8 @@ public final class LayoutBook {
     public var offscreen = Set<String>()
     /// Where the previous snapshot saw each window (same setup).
     var lastSeenAt: [String: Spot] = [:]
+    /// How the last `restorePlan` sorted the remembered windows.
+    public private(set) var planCounts = PlanCounts()
 
     public init(layouts: [String: [String: LayoutEntry]]) { self.layouts = layouts }
 
@@ -125,18 +137,28 @@ public final class LayoutBook {
         var nowAt: [String: Spot] = [:]
         for w in windows { nowAt[String(w.id)] = Geometry.whereIs(w.frame, in: screens) }
         var plan: [pid_t: [UInt32: RestoreTarget]] = [:]
+        var n = PlanCounts(remembered: layout.count)
         for (id, e) in layout {
             if !running.contains(e.pid) {
                 layout[id] = nil                       // that app has quit; its windows are gone
+                n.appQuit += 1
             } else if let p = protect[id], let at = nowAt[id], !Geometry.sameSpot(at, p) {
                 restoredIds.insert(id)                 // an earlier pass missed it and you've since moved it
                 protect[id] = nil
-            } else if connected.contains(e.scr) && !restoredIds.contains(id) && Geometry.sameSpot(nowAt[id], e.spot) {
+                n.yours += 1
+            } else if !connected.contains(e.scr) {
+                n.screenGone += 1
+            } else if restoredIds.contains(id) {
+                n.doneEarlier += 1
+            } else if Geometry.sameSpot(nowAt[id], e.spot) {
                 restoredIds.insert(id)                 // already in place
-            } else if connected.contains(e.scr) && !restoredIds.contains(id), let wid = UInt32(id) {
+                n.inPlace += 1
+            } else if let wid = UInt32(id) {
                 plan[e.pid, default: [:]][wid] = RestoreTarget(id: id, screenUUID: e.scr, unit: e.unit, from: nowAt[id])
+                n.toMove += 1
             }
         }
+        planCounts = n
         layouts[key] = layout
         return plan
     }

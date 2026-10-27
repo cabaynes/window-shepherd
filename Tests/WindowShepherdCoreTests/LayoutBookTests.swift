@@ -90,6 +90,7 @@ final class LayoutBookTests: XCTestCase {
         XCTAssertEqual(plan[10]?[1]?.screenUUID, "UUID-2")
         XCTAssertEqual(plan[10]?[1]?.from?.scr, "UUID-1")
         XCTAssertTrue(b.restoredIds.contains("2"), "in place: a later pass won't move it if you drag it")
+        XCTAssertEqual(b.planCounts, PlanCounts(remembered: 4, toMove: 1, inPlace: 1, doneEarlier: 1, screenGone: 1))
         XCTAssertNil(b.restorePlan(key: "NOPE", windows: [], screens: [lap], running: []))
     }
 

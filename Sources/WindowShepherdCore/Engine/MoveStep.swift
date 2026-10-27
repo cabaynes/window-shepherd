@@ -103,13 +103,21 @@ public func appStep<V>(pid: pid_t, wanted: [UInt32: V], system: WindowSystem, wo
         }
         let dead = Flag()
         var pos = ctx.index
+        let found = Set(listed.compactMap(\.0)).intersection(wanted.keys)
+        var yours = 0
+        var refused: [Int32] = []   // AX error codes of moves that failed
         for (maybeID, win) in listed {
             guard let id = maybeID, let value = wanted[id] else { continue }
             pos += 1
             ctx.insert({ _ in
-                if dead.on || !gate() || skip(id) { return nil }
+                if dead.on || !gate() { return nil }
+                if skip(id) { yours += 1; return nil }
                 let t1 = Date()
-                let ok = await worker.run { (try? action(win, value)) != nil }
+                let error: Int32? = await worker.run {
+                    do { try action(win, value); return nil } catch { return (error as? AXFailure)?.code ?? 0 }
+                }
+                let ok = error == nil
+                if let error { refused.append(error) }
                 guard gate() else { return nil }   // the screens changed meanwhile: it belongs to the old setup
                 if ok {
                     done.insert(id)
@@ -125,6 +133,15 @@ public func appStep<V>(pid: pid_t, wanted: [UInt32: V], system: WindowSystem, wo
                 return nil
             }, at: pos)
         }
+        // After its windows: say why any it wanted didn't move (a give-up says so itself).
+        ctx.insert({ _ in
+            guard !dead.on, gate(), done.count < wanted.count else { return nil }
+            var line = "\(name): \(wanted.count) to move, \(found.count) in its window list, \(done.count) moved"
+            if yours > 0 { line += ", \(yours) left where you put them" }
+            if !refused.isEmpty { line += ", \(refused.count) refused (AX \(refused.map(String.init).joined(separator: " ")))" }
+            Log.info(line)
+            return nil
+        }, at: pos + 1)
         return nil
     }
 }
