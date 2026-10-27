@@ -19,14 +19,27 @@ final class ShepherdMoveTests: XCTestCase {
         clock = Date()
     }
 
-    func make() -> Shepherd {
-        let s = Shepherd(system: sys, store: store, timing: MoveTiming(retryWaits: [0.05, 0.1]), now: { [unowned self] in self.clock })
+    func make(movePatience: TimeInterval = 0.3) -> Shepherd {
+        var timing = MoveTiming(retryWaits: [0.05, 0.1])
+        timing.maxWait = 0.4
+        timing.movePatience = movePatience
+        let s = Shepherd(system: sys, store: store, timing: timing, now: { [unowned self] in self.clock })
         s.onAlert = { [unowned self] in self.alerts.append($0) }
         s.start()
         return s
     }
 
     func rect(_ x: CGFloat) -> CGRect { CGRect(x: x, y: 125, width: 400, height: 300) }
+
+    func testBulkMoveWaitsForSlowApp() async {
+        sys.addApp(10, "Slow", windows: [(1, rect(100))])
+        sys.listBehaviour[10] = .throwTimes(4)
+        let s = make(movePatience: 1.5)
+        s.apply(Selection(pid: 10), placer: .fraction(0.9, on: .fixed(uuid: dell.uuid)), label: "DELL (90%)")
+        await waitUntil(4) { !s.isBusy }
+        XCTAssertGreaterThanOrEqual(sys.frameOf(1)?.minX ?? 0, 1000)
+        XCTAssertEqual(alerts, ["Moved 1 window → DELL (90%)"])
+    }
 
     func testThisWindowIsQuiet() async {
         sys.addApp(10, "Safari", windows: [(1, rect(100)), (2, rect(200))])

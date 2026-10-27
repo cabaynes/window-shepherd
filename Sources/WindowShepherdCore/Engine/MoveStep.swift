@@ -37,9 +37,12 @@ public struct MoveTiming {
     public var retryWaits: [TimeInterval] = [2, 4]
     /// With a patience deadline, later waits double from the last of `retryWaits`, up to this.
     public var maxWait: TimeInterval = 16
+    /// How long a bulk move keeps retrying apps that are slow or refuse.
+    public var movePatience: TimeInterval = 30
 
-    public init(windowLimit: TimeInterval = 1.5, listSlow: TimeInterval = 0.4, retryWaits: [TimeInterval] = [2, 4]) {
-        self.windowLimit = windowLimit; self.listSlow = listSlow; self.retryWaits = retryWaits
+    public init(windowLimit: TimeInterval = 1.5, listSlow: TimeInterval = 0.4, retryWaits: [TimeInterval] = [2, 4],
+                movePatience: TimeInterval = 30) {
+        self.windowLimit = windowLimit; self.listSlow = listSlow; self.retryWaits = retryWaits; self.movePatience = movePatience
     }
 
     public static let standard = MoveTiming()

@@ -19,8 +19,8 @@ final class FinalReviewFixTests: XCTestCase {
     }
 
     func make() -> Shepherd {
-        let s = Shepherd(system: sys, store: store, timing: MoveTiming(retryWaits: [0.05, 0.1]),
-                         restoreTiming: RestoreTiming(passes: [0.05, 0.15, 0.3], busyRecheck: 0.05, unsettledLimit: 1))
+        let s = Shepherd(system: sys, store: store, timing: MoveTiming(retryWaits: [0.05, 0.1], movePatience: 0.2),
+                         restoreTiming: RestoreTiming(passes: [0.05, 0.15, 0.3], busyRecheck: 0.05, unsettledLimit: 1, patience: 0.3))
         s.onAlert = { [unowned self] in self.alerts.append($0) }
         s.start()
         return s

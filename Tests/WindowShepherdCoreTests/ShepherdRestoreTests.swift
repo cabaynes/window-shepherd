@@ -21,9 +21,12 @@ final class ShepherdRestoreTests: XCTestCase {
         clock = Date()
     }
 
-    func make(passes: [TimeInterval] = [0.05, 0.15, 0.3]) -> Shepherd {
-        let s = Shepherd(system: sys, store: store, timing: MoveTiming(retryWaits: [0.05, 0.1]),
-                         restoreTiming: RestoreTiming(passes: passes, busyRecheck: 0.05, unsettledLimit: 1),
+    func make(passes: [TimeInterval] = [0.05, 0.15, 0.3], patience: TimeInterval = 0.5) -> Shepherd {
+        var timing = MoveTiming(retryWaits: [0.05, 0.1])
+        timing.maxWait = 0.4
+        timing.movePatience = 0.5
+        let s = Shepherd(system: sys, store: store, timing: timing,
+                         restoreTiming: RestoreTiming(passes: passes, busyRecheck: 0.05, unsettledLimit: 1, patience: patience),
                          now: { [unowned self] in self.clock })
         s.onAlert = { [unowned self] in self.alerts.append($0) }
         s.onBusyChanged = { [unowned self] in self.busy.append($0) }
@@ -63,6 +66,42 @@ final class ShepherdRestoreTests: XCTestCase {
         XCTAssertEqual(sys.frameOf(1)!.minX, 1100, accuracy: 0.5)
         XCTAssertEqual(sys.frameOf(2)!.minX, 1300, accuracy: 0.5)
         XCTAssertEqual(sys.frameOf(1)!.width, 400, accuracy: 0.5)
+    }
+
+    func testRestoreWaitsForSlowApp() async {
+        sys.addApp(10, "Safari", windows: [(1, rect(1100)), (2, rect(1300))])
+        let s = make(passes: [0.05], patience: 1.5)   // one pass: only patience can rescue it
+        s.tick()
+        sys.allScreens = [lap]
+        move(1, to: rect(50)); move(2, to: rect(80))
+        s.screensChanged()
+        await waitUntil { !s.isBusy }
+        sys.listBehaviour[10] = .throwTimes(sys.listCalls[10, default: 0] + 4)
+        sys.allScreens = [lap, dell]
+        s.tick()
+        await waitUntil(4) { !s.isBusy }
+        XCTAssertEqual(sys.frameOf(1)?.minX ?? 0, 1100, accuracy: 2)
+    }
+
+    func testInterruptedRestoreResumesAfterMove() async {
+        sys.addApp(10, "Safari", windows: [(1, rect(1100)), (2, rect(1300))])
+        sys.addApp(20, "Notes", windows: [(5, rect(60))])
+        let s = make(passes: [0.05])
+        s.tick()
+        sys.allScreens = [lap]
+        move(1, to: rect(50)); move(2, to: rect(80))
+        s.screensChanged()
+        await waitUntil { !s.isBusy }
+        sys.setDelay[1] = 0.2
+        sys.allScreens = [lap, dell]
+        s.tick()
+        await waitUntil { self.sys.setCount(1) >= 1 || s.runner.current != nil }
+        try? await Task.sleep(nanoseconds: 120_000_000)   // the restore is moving window 1
+        s.apply(Selection(pid: 20), placer: .fraction(0.9, on: .own), label: "90%")
+        await waitUntil(4) { !s.isBusy }
+        try? await Task.sleep(nanoseconds: 100_000_000)
+        await waitUntil(4) { !s.isBusy }
+        XCTAssertEqual(sys.frameOf(2)?.minX ?? 0, 1300, accuracy: 2, "the restore finished after the move")
     }
 
     func testUserMoveDuringPassesIsNotUndone() async {

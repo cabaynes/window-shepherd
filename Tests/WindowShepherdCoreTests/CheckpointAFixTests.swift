@@ -17,8 +17,8 @@ final class CheckpointAFixTests: XCTestCase {
     }
 
     func make() -> Shepherd {
-        let s = Shepherd(system: sys, store: store, timing: MoveTiming(retryWaits: [0.05, 0.1]),
-                         restoreTiming: RestoreTiming(passes: [5, 6, 7], busyRecheck: 5, unsettledLimit: 60))
+        let s = Shepherd(system: sys, store: store, timing: MoveTiming(retryWaits: [0.05, 0.1], movePatience: 0.2),
+                         restoreTiming: RestoreTiming(passes: [5, 6, 7], busyRecheck: 5, unsettledLimit: 60, patience: 0.3))
         s.start()
         return s
     }

@@ -35,7 +35,7 @@ public final class Shepherd {
     public let store: LayoutStore
     public let book: LayoutBook
     let timing: MoveTiming
-    let restoreTiming: RestoreTiming
+    var restoreTiming: RestoreTiming
     let now: () -> Date
 
     let runner = JobRunner()
@@ -49,6 +49,8 @@ public final class Shepherd {
 
     /// Restore passes scheduled but not yet run (they keep the icon red).
     var pendingPasses = 0
+    /// A restore your own move interrupted: run it again once the move is done.
+    var resumeRestore = false
     var restoreTimers: [Int: Task<Void, Never>] = [:]
     var nextTimerID = 0
     /// Apps with a keyboard/menu snap in flight, and the latest press waiting behind it.
@@ -106,10 +108,11 @@ public final class Shepherd {
         func finish(_ problem: JobProblem?) {
             tally.settle()
             let total = tally.moved
+            let refused = tally.refused.values.reduce(0) { $0 + $1.count }
             // Keyboard single-window moves stay silent (like Rectangle) unless something went wrong.
-            if !sel.quiet || !tally.skipped.isEmpty || problem != nil || total == 0 {
+            if !sel.quiet || !tally.skipped.isEmpty || problem != nil || total == 0 || refused > 0 {
                 alert(reportText("Moved \(total) window\(total == 1 ? "" : "s") → \(label)",
-                                 skipped: tally.skipped, hasMissed: !tally.missed.isEmpty, problem: problem))
+                                 skipped: tally.skipped, hasMissed: !tally.missed.isEmpty, problem: problem, refused: refused))
             }
             if let pid = sel.pid, sel.winId == nil, problem != .interrupted {   // whole app: bring it forward
                 let system = self.system
@@ -117,6 +120,11 @@ public final class Shepherd {
             }
             guard book.lastSetup == startSetup else { return }
             recordNow(tally.ids)
+            if resumeRestore {
+                resumeRestore = false
+                schedulePass(after: 0.1)
+                updateBusy()
+            }
             if !tally.missed.isEmpty || sel.retry {
                 offerRetry(.move, missed: tally.missed.mapValues { Set($0.keys) }) { [weak self] missed in
                     self?.apply(Selection(byPid: missed, retry: true), placer: placer, label: label)
@@ -162,9 +170,10 @@ public final class Shepherd {
         }
 
         let byPid = sel.byPid ?? windowIdsByPid(sel.pid)
+        let patientUntil = Date().addingTimeInterval(timing.movePatience)
         let steps: [JobStep] = byPid.keys.sorted().map { pid in
             appStep(pid: pid, wanted: Dictionary(uniqueKeysWithValues: byPid[pid]!.map { ($0, true) }),
-                    system: system, worker: jobWorker, timing: timing, tally: tally,
+                    system: system, worker: jobWorker, timing: timing, tally: tally, patientUntil: patientUntil,
                     gate: { [weak self] in self?.book.lastSetup == startSetup },   // screens changed: this target no longer exists
                     action: { win, _ in
                         guard let f = win.frame(), let r = placer.frame(for: f, screens: screens, main: main) else {
@@ -175,7 +184,7 @@ public final class Shepherd {
                     onMoved: { [weak self] id, _ in self?.book.restoredIds.insert(String(id)) })
         }
         let count = byPid.values.reduce(0) { $0 + $1.count }
-        runner.run(.move, steps: steps, deadline: deadlineFor(windowCount: count), done: finish)
+        runner.run(.move, steps: steps, deadline: max(deadlineFor(windowCount: count), timing.movePatience + 10), done: finish)
     }
 
     /// At most one snap per app in flight; a newer press replaces any waiting one.
@@ -316,9 +325,12 @@ public struct RestoreTiming {
     public var passes: [TimeInterval] = [3, 10, 20]
     public var busyRecheck: TimeInterval = 5
     public var unsettledLimit: TimeInterval = 60
+    /// How long after a screen change a restore keeps retrying apps that are slow or refuse.
+    public var patience: TimeInterval = 60
 
-    public init(passes: [TimeInterval] = [3, 10, 20], busyRecheck: TimeInterval = 5, unsettledLimit: TimeInterval = 60) {
-        self.passes = passes; self.busyRecheck = busyRecheck; self.unsettledLimit = unsettledLimit
+    public init(passes: [TimeInterval] = [3, 10, 20], busyRecheck: TimeInterval = 5, unsettledLimit: TimeInterval = 60,
+                patience: TimeInterval = 60) {
+        self.passes = passes; self.busyRecheck = busyRecheck; self.unsettledLimit = unsettledLimit; self.patience = patience
     }
 
     public static let standard = RestoreTiming()

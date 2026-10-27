@@ -107,8 +107,12 @@ extension Shepherd {
         }
         let main = system.mainScreen()
         let tally = Tally<RestoreTarget>()
+        // Patience runs from the screen change, so a resumed or late pass gets only what's left.
+        let remaining = book.changedAt + restoreTiming.patience - nowSeconds
+        let patientUntil = remaining > 0 ? Date().addingTimeInterval(remaining) : nil
         let steps: [JobStep] = plan.keys.sorted().map { pid in
             appStep(pid: pid, wanted: plan[pid]!, system: system, worker: jobWorker, timing: timing, tally: tally,
+                    patientUntil: patientUntil,
                     gate: { [weak self] in self?.book.lastSetup == key },
                     // You placed it while this job ran (a snap): it's yours now.
                     skip: { [weak self] id in self?.book.restoredIds.contains(String(id)) ?? true },
@@ -123,23 +127,28 @@ extension Shepherd {
         }
         let label = Screens.setupLabel(screens)
         let count = plan.values.reduce(0) { $0 + $1.count }
-        runner.run(.restore, steps: steps, deadline: deadlineFor(windowCount: count)) { [weak self] problem in
+        runner.run(.restore, steps: steps, deadline: max(deadlineFor(windowCount: count), remaining + 10)) { [weak self] problem in
             guard let self else { return }
             tally.settle()
             let total = tally.moved
+            var refused = tally.refused.values.reduce(0) { $0 + $1.count }
+            if problem == .interrupted && self.book.lastSetup == key {
+                self.resumeRestore = true           // your move came first; the restore picks up after it
+            }
             self.book.restoreFinished(plan: plan)
             self.book.settled = true                // snapshots may resume; missed windows stay protected
             if self.pendingPasses > 0 {             // the next pass retries skipped windows itself: don't announce them yet
                 tally.skipped = []
                 tally.missed = [:]
+                refused = 0
             }
             if problem != .interrupted {            // missed windows aren't in restoredIds, so restore() retries just them
                 self.offerRetry(.restore, missed: tally.missed.mapValues { Set($0.keys) }) { [weak self] _ in self?.restore() }
             }
             Log.info("restored \(total) windows for \(label)" + (problem.map { " (\($0))" } ?? ""))
-            if total > 0 || !tally.skipped.isEmpty || problem != nil {
+            if total > 0 || !tally.skipped.isEmpty || problem != nil || refused > 0 {
                 self.alert(reportText("Restored \(total) window\(total == 1 ? "" : "s") for this screen setup",
-                                      skipped: tally.skipped, hasMissed: !tally.missed.isEmpty, problem: problem))
+                                      skipped: tally.skipped, hasMissed: !tally.missed.isEmpty, problem: problem, refused: refused))
             }
         }
     }
