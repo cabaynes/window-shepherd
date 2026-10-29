@@ -57,6 +57,8 @@ public final class Shepherd {
     var pendingPasses = 0
     /// A restore your own move interrupted: run it again once the move is done.
     var resumeRestore = false
+    /// The window list at the last settled tick (to tell a tab switch from a window coming back).
+    var lastTickWindows: [CGWindow] = []
     var restoreTimers: [Int: Task<Void, Never>] = [:]
     var nextTimerID = 0
     /// Apps with a keyboard/menu snap in flight, and the latest press waiting behind it.
@@ -338,6 +340,8 @@ public struct RestoreTiming {
     public var unsettledLimit: TimeInterval = 60
     /// How long after a screen change a restore keeps retrying apps that are slow or refuse.
     public var patience: TimeInterval = 60
+    /// How long after a screen change a window that was off screen is put back when it shows up.
+    public var offscreenFor: TimeInterval = 600
 
     public init(passes: [TimeInterval] = [3, 10, 20], busyRecheck: TimeInterval = 5, unsettledLimit: TimeInterval = 60,
                 patience: TimeInterval = 60) {

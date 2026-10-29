@@ -242,6 +242,25 @@ public final class LayoutBook {
         return plan
     }
 
+    /// Finder tabs are separate windows sharing one spot; only the front tab is
+    /// on screen. A waiting window that appears exactly where another window of
+    /// its app was a moment ago, which has just left the screen, is a tab
+    /// switch, not a window coming back: stop waiting for it and leave it be.
+    public func dropTabSwitches(shown: [CGWindow], previous: [CGWindow]) {
+        let nowIds = Set(shown.map(\.id))
+        for w in shown where offscreen.contains(String(w.id)) {
+            let replaced = previous.contains { p in
+                p.pid == w.pid && p.id != w.id && !nowIds.contains(p.id)
+                    && abs(p.frame.minX - w.frame.minX) <= 1 && abs(p.frame.minY - w.frame.minY) <= 1
+                    && abs(p.frame.width - w.frame.width) <= 1 && abs(p.frame.height - w.frame.height) <= 1
+            }
+            if replaced {
+                offscreen.remove(String(w.id))
+                restoredIds.insert(String(w.id))
+            }
+        }
+    }
+
     /// True when a window the restore couldn't see is on screen now.
     public func offscreenVisible(_ windows: [CGWindow]) -> Bool {
         !offscreen.isEmpty && windows.contains { offscreen.contains(String($0.id)) && !restoredIds.contains(String($0.id)) }

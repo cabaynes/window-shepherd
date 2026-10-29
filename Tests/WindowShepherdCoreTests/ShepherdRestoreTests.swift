@@ -244,6 +244,55 @@ final class ShepherdRestoreTests: XCTestCase {
         XCTAssertFalse(s.resumeRestore)
     }
 
+    /// Finder tabs are separate windows at one spot; only the front tab is on screen.
+    func finderTabsAfterReplug() async -> Shepherd {
+        sys.addApp(20, "Finder", windows: [(1, rect(1100)), (2, rect(1300))])
+        let s = make()
+        s.tick()                                         // both tabs remembered on the Dell
+        sys.allScreens = [lap]
+        move(1, to: rect(50)); move(2, to: rect(50))     // the tabbed window lands on the built-in screen
+        sys.locked { sys.windows.removeAll { $0.id == 2 }; sys.offSpace = [2] }   // tab 2 behind tab 1
+        s.screensChanged()
+        await waitUntil { !s.isBusy }
+        sys.failSet = [1]                                // the replug can't move it: tab 2 stays "offscreen"
+        sys.allScreens = [lap, dell]
+        s.tick()
+        await waitUntil(4) { !s.isBusy }
+        sys.failSet = []
+        s.tick()
+        return s
+    }
+
+    func testSwitchingFinderTabsDoesNotMoveTheWindow() async {
+        let s = await finderTabsAfterReplug()
+        let before = sys.setCount(2)
+        // You click tab 2: it takes tab 1's place on screen.
+        let front = sys.frameOf(1)!
+        sys.locked {
+            sys.windows.removeAll { $0.id == 1 }
+            sys.offSpace = [1]
+            sys.windows.append(CGWindow(id: 2, pid: 20, app: "Finder", title: "Doc", frame: front))
+        }
+        s.tick(); s.tick()
+        try? await Task.sleep(nanoseconds: 200_000_000)
+        await waitUntil { !s.isBusy }
+        XCTAssertEqual(sys.setCount(2), before, "a tab switch isn't a window coming back")
+    }
+
+    func testOffscreenCatchUpExpires() async {
+        let s = await finderTabsAfterReplug()
+        let before = sys.setCount(2)
+        clock = clock.addingTimeInterval(601)           // ten minutes after the screen change
+        sys.locked {
+            sys.offSpace = []
+            sys.windows.append(CGWindow(id: 2, pid: 20, app: "Finder", title: "Doc", frame: rect(300)))
+        }
+        s.tick(); s.tick()
+        try? await Task.sleep(nanoseconds: 200_000_000)
+        await waitUntil { !s.isBusy }
+        XCTAssertEqual(sys.setCount(2), before, "too long after the change to be a window coming back")
+    }
+
     func testUserMoveDuringPassesIsNotUndone() async {
         let s = await rememberedThenUnplugged()
         sys.allScreens = [lap, dell]

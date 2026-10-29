@@ -63,9 +63,18 @@ extension Shepherd {
         // half-moved positions would be recorded. Never stay unsettled for long.
         if !book.settled && nowSeconds - book.changedAt > restoreTiming.unsettledLimit { book.settled = true }
         if book.settled && runner.current == nil {
+            let shown = system.visibleWindows()
+            defer { lastTickWindows = shown }
+            if !book.offscreen.isEmpty {
+                if nowSeconds - book.changedAt > restoreTiming.offscreenFor {
+                    book.offscreen = []   // too long after the change: it's just a window you opened
+                } else {
+                    book.dropTabSwitches(shown: shown, previous: lastTickWindows)
+                }
+            }
             // A window that was on another Space during the restore just showed
             // up where macOS left it: put it back now (and don't record that spot).
-            if book.offscreenVisible(system.visibleWindows()) {
+            if book.offscreenVisible(shown) {
                 restore()
                 return
             }
