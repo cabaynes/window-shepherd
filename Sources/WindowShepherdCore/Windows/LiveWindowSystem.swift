@@ -96,9 +96,18 @@ final class AXWindow: WindowHandle {
 /// timeout — the system-wide element (the default for all) and, as a second
 /// guard, each app and window element we create.
 public final class LiveWindowSystem: WindowSystem {
+    private var mouseUsed: Date?
+    private var mouseMonitor: Any?
+
     public init() {
         AXUIElementSetMessagingTimeout(AXUIElementCreateSystemWide(), axTimeout)
+        // Only notes the time: nothing here can slow the Mac.
+        mouseMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .leftMouseDragged]) { [weak self] _ in
+            self?.mouseUsed = Date()
+        }
     }
+
+    public func lastMouseUse() -> Date? { mouseUsed }
 
     public func visibleWindows() -> [CGWindow] { CGWindow.current() }
     public func allWindowIDs() -> Set<UInt32> { CGWindow.allIDs() }

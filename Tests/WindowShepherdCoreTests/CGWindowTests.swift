@@ -29,4 +29,10 @@ final class CGWindowTests: XCTestCase {
         XCTAssertEqual(out[0].frame, CGRect(x: 10, y: 20, width: 500, height: 400))
         XCTAssertEqual(out[1].app, "?")
     }
+
+    /// The lock screen after a wake is a layer-0 window too; it was being remembered and "restored".
+    func testParseSkipsTheLockScreen() {
+        let out = CGWindow.parse([row(1, owner: "loginwindow"), row(2)], excludingPID: nil)
+        XCTAssertEqual(out.map(\.id), [2])
+    }
 }

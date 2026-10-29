@@ -27,6 +27,9 @@ public protocol WindowSystem: AnyObject {
     func runningApps() -> [pid_t: String]        // main
     func isRunning(bundleID: String) -> Bool     // main
     func appName(pid: pid_t) -> String?          // main
+    /// When the left mouse button was last pressed or dragged, in any app:
+    /// a window that moved without it was moved by macOS or its app, not by you.
+    func lastMouseUse() -> Date?                 // main
     func appWindows(pid: pid_t) throws -> [WindowHandle]   // worker
     func focusedWindow(pid: pid_t) -> WindowHandle?        // worker
     func activate(pid: pid_t)                              // worker

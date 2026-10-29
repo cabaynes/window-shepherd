@@ -44,6 +44,12 @@ final class ShepherdRestoreTests: XCTestCase {
         }
     }
 
+    /// You drag it with the mouse.
+    func drag(_ id: UInt32, to r: CGRect) {
+        sys.locked { sys.mouseUsed = Date() }
+        move(id, to: r)
+    }
+
     /// Two windows remembered on the Dell, then unplugged (dumped on the laptop).
     func rememberedThenUnplugged() async -> Shepherd {
         sys.addApp(10, "Safari", windows: [(1, rect(1100)), (2, rect(1300))])
@@ -218,9 +224,29 @@ final class ShepherdRestoreTests: XCTestCase {
         sys.allScreens = [lap, dell]
         s.tick()
         try? await Task.sleep(nanoseconds: 120_000_000)
-        move(1, to: rect(600))                       // you drag it while the restore waits for Safari
+        drag(1, to: rect(600))                       // you drag it while the restore waits for Safari
         await waitUntil(4) { !s.isBusy }
         XCTAssertEqual(sys.frameOf(1), rect(600), "yours now")
+        XCTAssertEqual(sys.frameOf(2)?.minX ?? 0, 1300, accuracy: 0.5)
+    }
+
+    /// Live 2026-10-29: after a wake, macOS (or the busy app catching up) moved windows
+    /// between the plan and their turn, and every one was taken for your drag.
+    func testSystemMoveDuringPatientRestoreIsStillRestored() async {
+        sys.addApp(10, "Safari", windows: [(1, rect(1100)), (2, rect(1300))])
+        let s = make(passes: [0.05], patience: 2)
+        s.tick()
+        sys.allScreens = [lap]
+        move(1, to: rect(50)); move(2, to: rect(80))
+        s.screensChanged()
+        await waitUntil { !s.isBusy }
+        sys.listBehaviour[10] = .throwTimes(sys.listCalls[10, default: 0] + 3)   // answers on the 4th try
+        sys.allScreens = [lap, dell]
+        s.tick()
+        try? await Task.sleep(nanoseconds: 120_000_000)
+        move(1, to: rect(600))                       // the app shifts it itself; no drag
+        await waitUntil(4) { !s.isBusy }
+        XCTAssertEqual(sys.frameOf(1)?.minX ?? 0, 1100, accuracy: 0.5, "not yours: put back")
         XCTAssertEqual(sys.frameOf(2)?.minX ?? 0, 1300, accuracy: 0.5)
     }
 
@@ -299,7 +325,7 @@ final class ShepherdRestoreTests: XCTestCase {
         s.tick()
         await waitUntil { self.sys.setCount(1) >= 1 }
         try? await Task.sleep(nanoseconds: 30_000_000)
-        move(1, to: rect(200))    // you drag it back to the laptop
+        drag(1, to: rect(200))    // you drag it back to the laptop
         await waitUntil { !s.isBusy }
         try? await Task.sleep(nanoseconds: 50_000_000)
         XCTAssertEqual(sys.frameOf(1), rect(200))

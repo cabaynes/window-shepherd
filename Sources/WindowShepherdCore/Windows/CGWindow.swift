@@ -17,10 +17,12 @@ public struct CGWindow: Equatable {
     }
 
     /// Normal app windows visible right now (layer 0, on screen, both sides
-    /// over 80 pt), front to back. `excludingPID` drops our own windows.
+    /// over 80 pt), front to back. `excludingPID` drops our own windows; the
+    /// lock screen (loginwindow) is never one.
     public static func parse(_ list: [[String: Any]], excludingPID: pid_t?) -> [CGWindow] {
         list.compactMap { w in
-            guard (w[kCGWindowLayer as String] as? Int) == 0,
+            let owner = w[kCGWindowOwnerName as String] as? String
+            guard (w[kCGWindowLayer as String] as? Int) == 0, owner != "loginwindow",
                   (w[kCGWindowIsOnscreen as String] as? Bool) == true,
                   let id = (w[kCGWindowNumber as String] as? NSNumber)?.uint32Value,
                   let pid = (w[kCGWindowOwnerPID as String] as? NSNumber)?.int32Value,
@@ -28,7 +30,7 @@ public struct CGWindow: Equatable {
                   let b = w[kCGWindowBounds as String] as? [String: Any],
                   let rect = CGRect(dictionaryRepresentation: b as CFDictionary),
                   rect.width > 80, rect.height > 80 else { return nil }
-            return CGWindow(id: id, pid: pid, app: (w[kCGWindowOwnerName as String] as? String) ?? "?",
+            return CGWindow(id: id, pid: pid, app: owner ?? "?",
                             title: w[kCGWindowName as String] as? String, frame: rect)
         }
     }

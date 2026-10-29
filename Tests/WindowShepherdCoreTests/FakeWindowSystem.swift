@@ -45,6 +45,7 @@ final class FakeWindowSystem: WindowSystem {
     var activated: [pid_t] = []
     var listCalls: [pid_t: Int] = [:]
     var offSpace: Set<UInt32> = []
+    var mouseUsed: Date?                         // the last left-button press or drag
     var noFrame: Set<UInt32> = []                // frame() fails for these (the app didn't answer)               // exist (another Space, minimized) but aren't on screen
 
     var windowsByID: [UInt32: CGWindow] { Dictionary(uniqueKeysWithValues: windows.map { ($0.id, $0) }) }
@@ -68,6 +69,7 @@ final class FakeWindowSystem: WindowSystem {
     func runningApps() -> [pid_t: String] { locked { apps } }
     func isRunning(bundleID: String) -> Bool { locked { bundles.contains(bundleID) } }
     func appName(pid: pid_t) -> String? { locked { apps[pid] } }
+    func lastMouseUse() -> Date? { locked { mouseUsed } }
 
     func appWindows(pid: pid_t) throws -> [WindowHandle] {
         let behaviour: ListBehaviour = locked {

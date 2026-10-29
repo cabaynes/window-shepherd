@@ -160,6 +160,7 @@ extension Shepherd {
         let patientUntil = remaining > 0 ? Date().addingTimeInterval(remaining) : nil
         // A patient job does the later passes' work itself: drop them, or they'd run after it, past the budget.
         if patientUntil != nil { cancelRestores() }
+        let plannedAt = Date()
         let steps: [JobStep] = plan.keys.sorted().map { pid in
             appStep(pid: pid, wanted: plan[pid]!, system: system, worker: jobWorker, timing: timing, tally: tally,
                     patientUntil: patientUntil,
@@ -169,9 +170,16 @@ extension Shepherd {
                         guard let self else { return true }
                         if self.book.restoredIds.contains(String(id)) { return true }
                         // Dragged since the plan was made (no snapshot runs during a job): yours now.
+                        // Moved with no mouse use since then: macOS or the app moved it (after a wake or
+                        // an unplug they do, for a while), so it still goes back (live 2026-10-29).
                         guard let from = plan[pid]?[id]?.from,
                               let w = self.system.visibleWindows().first(where: { $0.id == id }),
                               !Geometry.sameSpot(Geometry.whereIs(w.frame, in: screens), from) else { return false }
+                        guard let used = self.system.lastMouseUse(), used > plannedAt else {
+                            Log.info("\(w.app) window \(id) moved since the plan with no mouse use: putting it back")
+                            return false
+                        }
+                        Log.info("\(w.app) window \(id) dragged since the plan: left there")
                         self.book.restoredIds.insert(String(id))
                         self.book.protect[String(id)] = nil
                         self.book.markYours(String(id))
