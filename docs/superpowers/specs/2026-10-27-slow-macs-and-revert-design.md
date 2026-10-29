@@ -20,13 +20,11 @@ The goal: work properly on memory-stretched Macs, and always give the user a one
 2. **Frozen copy per screen combination.** When the screens change away from a combination, keep a copy of where every window was in that combination, with the time. Live saving continues as now. The frozen copy changes only at the next departure from that combination. It's saved to disk, so restarts and sleep keep it.
 3. **Both directions.** It works for unplugging (all screens → built-in alone) and plugging in (→ built-in + monitor), and for any combination: iMac + monitor, Mac mini + two monitors.
 4. **Flashing icon when windows were left behind.** When the restore after a screen change has finished, including its patience time, and some visible windows still aren't where the frozen copy says, the ⧉ icon flashes red until the user clicks it. Opening the menu stops the flashing.
-5. **Revert row at the top of the menu.** After a screen change, and while a frozen copy exists for the current combination, the menu's first row is:
+5. **Revert row at the top of the menu.** After a screen change, while a frozen copy exists for the current combination **and N > 0**, the menu's first row is one line:
 
-   > **Revert ⟨combination name⟩**
-   > to how it was at ⟨time⟩, before they were separated
-   > ⟨N⟩ windows aren't where they were then
+   > **Put back ⟨N⟩ windows as they were at ⟨time⟩** ("Put back 1 window as it was at ⟨time⟩")
 
-   The combination name uses macOS's display names (`Screens.setupLabel`, e.g. "Built-in Retina Display + DELL U2718Q"), never "laptop". N is counted when the menu opens: visible windows from the frozen copy whose current spot differs. When N is 0, the second sub-line reads "Every window is where it was then". The row stays until the next screen change ("all evening"). Clicking it moves **every** visible window in the frozen copy back to its spot, including ones arranged since the plug-in, using the same patient job. Moved windows are then recorded live as usual.
+   N is counted when the menu opens: visible windows from the frozen copy whose current spot differs. When N is 0 there is no row. It never shows past the next screen change. (Changed 2026-10-28 after live use, by Charles: the first version was three lines that all did the same thing and stayed all evening, even when it would do nothing.) Clicking it moves **every** visible window in the frozen copy back to its spot, including ones arranged since the plug-in, using the same patient job. Moved windows are then recorded live as usual.
 6. **Refused moves count.** A window whose move fails (an AX error, not just a slow app) counts as left behind. It's included in the retry offer and the flashing/Revert count, and the alert says so.
 7. **Retry row doesn't expire after 2 minutes.** The manual-move Retry row lasts until the next move, a screen change, or every window it lists has closed.
 8. **Forget closed windows.** Remembered windows that no longer exist while their app is still running are dropped. "Exist" means present in the full CoreGraphics window list (`.optionAll`, which includes other Spaces and minimized windows), not just on screen. Today Chrome shows 37 remembered and 3 open, which pads every count and plan.
@@ -75,7 +73,6 @@ The goal: work properly on memory-stretched Macs, and always give the user a one
 - The flashing state ends when the menu opens, at the next screen change, or when a later pass or Revert leaves N = 0.
 - Flashing is a cheap timer swapping the status item image (about 1 s period). My call: when the system "Reduce motion" setting is on, show the steady red icon instead of flashing.
 - Counts consider only windows visible on screen now (as restores do today). Windows on other Spaces or minimized aren't counted as left behind.
-- Wording "before they were separated" is a placeholder. Charles may change it.
 
 ## Left to the builder
 

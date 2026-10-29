@@ -229,7 +229,7 @@ Checked against `main` at 9191ace and the parity checklist (all 37 lines live-te
   - Every question to an app gives up after **0.5 s** (`LiveWindowSystem.swift:10`).
   - If one window takes over **1.5 s**, the app can't list its windows, or it refuses a move, it's tried again with growing waits (2 s, 4 s, 8 s…, up to 16 s apart) for up to **60 s** after a screen change, or **30 s** for a move you asked for (`RestoreTiming.patience`, `MoveTiming.movePatience`). If it still fails, it's skipped and named in the message.
   - Until your next move or screen change, the menu offers "Retry N windows that didn't move" (`RetryOffer.swift`).
-  - After a restore that left windows behind, the ⧉ flashes until you open the menu, and the menu's top row offers **Revert <screens>** to the frozen copy taken when you last unplugged (`Shepherd+Revert.swift`).
+  - After a restore that left windows behind, the ⧉ flashes until you open the menu, and, while some windows are out of place, the menu's top row offers **Put back N windows as they were at <time>**, from the frozen copy taken when the screens last changed (`Shepherd+Revert.swift`).
   - Windows opened while undocked go to the biggest screen at 90% when you plug in, by default (`UndockedWindows.swift`).
 - It can't pick out *some* of an app's windows (one Chrome project): it moves all of an app's windows, or one window.
 

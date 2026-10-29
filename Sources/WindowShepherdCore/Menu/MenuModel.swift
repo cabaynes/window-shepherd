@@ -75,14 +75,11 @@ public enum MenuModel {
         if i.needsAccess {
             menu += [.item(title: "Grant Accessibility permission…", keys: nil, action: .grantAccess), .separator]
         }
-        if let r = i.revert {
-            let n = r.notWhere
-            menu.append(.item(title: "Revert " + r.label, keys: nil, action: .revert))
-            menu.append(.item(title: "to how it was at \(revertTime(r.at, now: Date())), before they were separated",
-                              keys: nil, action: .revert, indent: 1))
-            menu.append(.item(title: n == 0 ? "Every window is where it was then"
-                                : n == 1 ? "1 window isn't where it was then" : "\(n) windows aren't where they were then",
-                              keys: nil, action: .revert, indent: 1))
+        // Only when it would do something: some windows aren't where the frozen copy has them.
+        if let r = i.revert, r.notWhere > 0 {
+            let n = r.notWhere, when = revertTime(r.at, now: Date())
+            menu.append(.item(title: n == 1 ? "Put back 1 window as it was at \(when)" : "Put back \(n) windows as they were at \(when)",
+                              keys: nil, action: .revert))
             menu.append(.separator)
         }
         if let r = i.retry {
