@@ -61,6 +61,16 @@ public enum Screens {
         return list.enumerated().map { Destination(screen: $1.0, name: $1.1, num: $0 + 1, isLaptop: $1.2) }
     }
 
+    /// The largest screen by area; a tie goes to a monitor over the built-in, then the first.
+    public static func biggest(_ screens: [ScreenInfo]) -> ScreenInfo? {
+        func area(_ s: ScreenInfo) -> CGFloat { s.full.width * s.full.height }
+        return screens.enumerated().max { a, b in
+            if area(a.element) != area(b.element) { return area(a.element) < area(b.element) }
+            if a.element.isBuiltin != b.element.isBuiltin { return a.element.isBuiltin }
+            return a.offset > b.offset
+        }?.element
+    }
+
     /// Identity of a combination of connected screens.
     public static func setupKey(_ screens: [ScreenInfo]) -> String {
         screens.map(\.uuid).sorted().joined(separator: "+")

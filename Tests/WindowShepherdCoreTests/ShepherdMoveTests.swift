@@ -19,14 +19,49 @@ final class ShepherdMoveTests: XCTestCase {
         clock = Date()
     }
 
-    func make() -> Shepherd {
-        let s = Shepherd(system: sys, store: store, timing: MoveTiming(retryWaits: [0.05, 0.1]), now: { [unowned self] in self.clock })
+    func make(movePatience: TimeInterval = 0.3) -> Shepherd {
+        var timing = MoveTiming(retryWaits: [0.05, 0.1])
+        timing.maxWait = 0.4
+        timing.movePatience = movePatience
+        let s = Shepherd(system: sys, store: store, timing: timing, now: { [unowned self] in self.clock })
         s.onAlert = { [unowned self] in self.alerts.append($0) }
         s.start()
         return s
     }
 
     func rect(_ x: CGFloat) -> CGRect { CGRect(x: x, y: 125, width: 400, height: 300) }
+
+    func testBulkMoveWaitsForSlowApp() async {
+        sys.addApp(10, "Slow", windows: [(1, rect(100))])
+        sys.listBehaviour[10] = .throwTimes(4)
+        let s = make(movePatience: 1.5)
+        s.apply(Selection(pid: 10), placer: .fraction(0.9, on: .fixed(uuid: dell.uuid)), label: "DELL (90%)")
+        await waitUntil(4) { !s.isBusy }
+        XCTAssertGreaterThanOrEqual(sys.frameOf(1)?.minX ?? 0, 1000)
+        XCTAssertEqual(alerts, ["Moved 1 window → DELL (90%)"])
+    }
+
+    func testRetryOfferOutlivesTwoMinutes() async {
+        sys.addApp(10, "Hung", windows: [(1, rect(100))])
+        sys.listBehaviour[10] = .throwAlways
+        let s = make()
+        s.apply(.everything, placer: .fraction(1, on: .own), label: "Full screen")
+        await waitUntil(3) { self.alerts.count == 1 }
+        XCTAssertNotNil(s.retryOffer)
+        clock = clock.addingTimeInterval(600)
+        XCTAssertEqual(s.retryRows()?.count, 1, "still offered ten minutes later")
+    }
+
+    func testNewMoveClearsRetryOffer() async {
+        sys.addApp(10, "Hung", windows: [(1, rect(100))])
+        sys.listBehaviour[10] = .throwAlways
+        let s = make()
+        s.apply(.everything, placer: .fraction(1, on: .own), label: "Full screen")
+        await waitUntil(3) { self.alerts.count == 1 }
+        XCTAssertNotNil(s.retryOffer)
+        s.apply(.everything, placer: .fraction(0.9, on: .own), label: "90%")
+        XCTAssertNil(s.retryOffer, "a new move replaces the old offer")
+    }
 
     func testThisWindowIsQuiet() async {
         sys.addApp(10, "Safari", windows: [(1, rect(100)), (2, rect(200))])
@@ -178,8 +213,9 @@ final class ShepherdMoveTests: XCTestCase {
         s.apply(.everything, placer: .fraction(1, on: .own), label: "Full screen")
         await waitUntil { self.alerts.count == 3 }
         XCTAssertNotNil(s.retryRows())
-        clock = clock.addingTimeInterval(121)
-        XCTAssertNil(s.retryRows(), "expires after 2 minutes")
+        sys.allScreens = [lap]
+        s.screensChanged()
+        XCTAssertNil(s.retryRows(), "a screen change clears it")
     }
 
     func testRetryTitlesTruncated() async {

@@ -10,6 +10,8 @@ final class SettingsModel: ObservableObject {
     @Published private(set) var revision = 0
     /// The connected screens, numbered as the screen keys use them; kept live.
     @Published private(set) var screens = Screens.destinations(Screens.live())
+    /// "Windows opened while undocked", saved as soon as it changes.
+    @Published private(set) var undocked = UndockedStore().load()
     private let recorder = KeyRecorder()
     private var scan: ScanHandle?
     private var screenWatch: NSObjectProtocol?
@@ -45,6 +47,11 @@ final class SettingsModel: ObservableObject {
         }
         guard let name = KeyCodes.name(for: code) else { return }
         flow.recorded(mods: mods(fromCGFlags: flags), key: name)
+    }
+
+    func setUndocked(_ u: UndockedWindows) {
+        undocked = u
+        UndockedStore().save(u)
     }
 
     func opened() {

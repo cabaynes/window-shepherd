@@ -33,9 +33,12 @@ public struct MenuContext: Equatable {
 public final class Shepherd {
     public let system: WindowSystem
     public let store: LayoutStore
+    public let frozenStore: FrozenStore
+    /// The last screen change (persisted): the Revert row is for that combination.
+    public internal(set) var lastChange: (key: String, at: Double)?
     public let book: LayoutBook
     let timing: MoveTiming
-    let restoreTiming: RestoreTiming
+    var restoreTiming: RestoreTiming
     let now: () -> Date
 
     let runner = JobRunner()
@@ -46,22 +49,33 @@ public final class Shepherd {
     public var onBusyChanged: ((Bool) -> Void)?
     public internal(set) var isBusy = false
     public internal(set) var retryOffer: RetryOffer?
+    /// A restore left windows behind and you haven't opened the menu since.
+    public internal(set) var flashing = false
+    public var onFlashChanged: ((Bool) -> Void)?
 
     /// Restore passes scheduled but not yet run (they keep the icon red).
     var pendingPasses = 0
+    /// A restore your own move interrupted: run it again once the move is done.
+    var resumeRestore = false
+    /// The window list at the last settled tick (to tell a tab switch from a window coming back).
+    var lastTickWindows: [CGWindow] = []
     var restoreTimers: [Int: Task<Void, Never>] = [:]
     var nextTimerID = 0
     /// Apps with a keyboard/menu snap in flight, and the latest press waiting behind it.
     var snapInFlight = Set<pid_t>()
     var snapPending: [pid_t: @MainActor () async -> Void] = [:]
 
+    /// Where windows opened while a screen was unplugged go when it's back.
+    public var undocked = UndockedWindows.defaults
+
     /// True while Accessibility is missing: the tick does nothing.
     public var paused = false
 
-    public init(system: WindowSystem, store: LayoutStore, timing: MoveTiming = .standard,
+    public init(system: WindowSystem, store: LayoutStore, frozenStore: FrozenStore? = nil, timing: MoveTiming = .standard,
                 restoreTiming: RestoreTiming = .standard, now: @escaping () -> Date = Date.init) {
         self.system = system
         self.store = store
+        self.frozenStore = frozenStore ?? FrozenStore(url: FrozenStore.url(beside: store.url))
         self.timing = timing
         self.restoreTiming = restoreTiming
         self.now = now
@@ -102,14 +116,16 @@ public final class Shepherd {
         let screens = system.screens()
         let main = system.mainScreen()
         let tally = Tally<Bool>()
+        if !sel.retry { retryOffer = nil }   // a new move replaces the old offer
 
         func finish(_ problem: JobProblem?) {
             tally.settle()
             let total = tally.moved
+            let refused = tally.refused.values.reduce(0) { $0 + $1.count }
             // Keyboard single-window moves stay silent (like Rectangle) unless something went wrong.
-            if !sel.quiet || !tally.skipped.isEmpty || problem != nil || total == 0 {
+            if !sel.quiet || !tally.skipped.isEmpty || problem != nil || total == 0 || refused > 0 {
                 alert(reportText("Moved \(total) window\(total == 1 ? "" : "s") → \(label)",
-                                 skipped: tally.skipped, hasMissed: !tally.missed.isEmpty, problem: problem))
+                                 skipped: tally.skipped, hasMissed: !tally.missed.isEmpty, problem: problem, refused: refused))
             }
             if let pid = sel.pid, sel.winId == nil, problem != .interrupted {   // whole app: bring it forward
                 let system = self.system
@@ -117,6 +133,11 @@ public final class Shepherd {
             }
             guard book.lastSetup == startSetup else { return }
             recordNow(tally.ids)
+            if resumeRestore {
+                resumeRestore = false
+                schedulePass(after: 0.1)
+                updateBusy()
+            }
             if !tally.missed.isEmpty || sel.retry {
                 offerRetry(.move, missed: tally.missed.mapValues { Set($0.keys) }) { [weak self] missed in
                     self?.apply(Selection(byPid: missed, retry: true), placer: placer, label: label)
@@ -162,9 +183,10 @@ public final class Shepherd {
         }
 
         let byPid = sel.byPid ?? windowIdsByPid(sel.pid)
+        let patientUntil = Date().addingTimeInterval(timing.movePatience)
         let steps: [JobStep] = byPid.keys.sorted().map { pid in
             appStep(pid: pid, wanted: Dictionary(uniqueKeysWithValues: byPid[pid]!.map { ($0, true) }),
-                    system: system, worker: jobWorker, timing: timing, tally: tally,
+                    system: system, worker: jobWorker, timing: timing, tally: tally, patientUntil: patientUntil,
                     gate: { [weak self] in self?.book.lastSetup == startSetup },   // screens changed: this target no longer exists
                     action: { win, _ in
                         guard let f = win.frame(), let r = placer.frame(for: f, screens: screens, main: main) else {
@@ -175,7 +197,7 @@ public final class Shepherd {
                     onMoved: { [weak self] id, _ in self?.book.restoredIds.insert(String(id)) })
         }
         let count = byPid.values.reduce(0) { $0 + $1.count }
-        runner.run(.move, steps: steps, deadline: deadlineFor(windowCount: count), done: finish)
+        runner.run(.move, steps: steps, deadline: max(deadlineFor(windowCount: count), timing.movePatience + 10), done: finish)
     }
 
     /// At most one snap per app in flight; a newer press replaces any waiting one.
@@ -279,12 +301,9 @@ public final class Shepherd {
     }
 
     /// The retry offer's rows (sorted "App — Title"), or nil when there is
-    /// none: expired, or every window it lists has closed.
+    /// none, or every window it lists has closed.
     public func retryRows() -> (count: Int, titles: [String])? {
-        guard let offer = retryOffer, now().timeIntervalSince(offer.at) <= retryFor else {
-            retryOffer = nil
-            return nil
-        }
+        guard let offer = retryOffer else { return nil }
         var titles: [String] = []
         for w in system.visibleWindows() where offer.missed[w.pid]?.contains(w.id) == true {
             titles.append(retryTitle(app: w.app, title: w.title))
@@ -305,6 +324,9 @@ public final class Shepherd {
 
     /// At launch: no restore, just start remembering.
     public func start() {
+        let saved = frozenStore.load()
+        book.frozen = saved.copies
+        if let k = saved.lastChangeKey, let at = saved.lastChangeAt { lastChange = (k, at) }
         book.prune(running: system.runningApps())
         let key = Screens.setupKey(system.screens())
         book.lastSetup = key
@@ -316,9 +338,14 @@ public struct RestoreTiming {
     public var passes: [TimeInterval] = [3, 10, 20]
     public var busyRecheck: TimeInterval = 5
     public var unsettledLimit: TimeInterval = 60
+    /// How long after a screen change a restore keeps retrying apps that are slow or refuse.
+    public var patience: TimeInterval = 60
+    /// How long after a screen change a window that was off screen is put back when it shows up.
+    public var offscreenFor: TimeInterval = 600
 
-    public init(passes: [TimeInterval] = [3, 10, 20], busyRecheck: TimeInterval = 5, unsettledLimit: TimeInterval = 60) {
-        self.passes = passes; self.busyRecheck = busyRecheck; self.unsettledLimit = unsettledLimit
+    public init(passes: [TimeInterval] = [3, 10, 20], busyRecheck: TimeInterval = 5, unsettledLimit: TimeInterval = 60,
+                patience: TimeInterval = 60) {
+        self.passes = passes; self.busyRecheck = busyRecheck; self.unsettledLimit = unsettledLimit; self.patience = patience
     }
 
     public static let standard = RestoreTiming()

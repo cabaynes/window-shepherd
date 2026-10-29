@@ -30,6 +30,61 @@ final class MoveStepTests: XCTestCase {
         XCTAssertEqual(sys.frameOf(1), target)
     }
 
+    private func runPatient(_ sys: FakeWindowSystem, pid: pid_t, wanted: [UInt32: Bool], for seconds: TimeInterval) async -> Tally<Bool> {
+        var t = MoveTiming(windowLimit: 0.8, listSlow: 0.4, retryWaits: [0.05, 0.1])
+        t.maxWait = 0.2
+        let tally = Tally<Bool>()
+        let runner = JobRunner()
+        var finished = false
+        let step = appStep(pid: pid, wanted: wanted, system: sys, worker: worker, timing: t, tally: tally,
+                           patientUntil: Date().addingTimeInterval(seconds),
+                           action: { win, _ in try win.setFrame(self.target) })
+        runner.run(.move, steps: [step], deadline: seconds + 2) { _ in finished = true }
+        await waitUntil(seconds + 3) { finished }
+        tally.settle()
+        return tally
+    }
+
+    func testPatientRetriesUntilAppAnswers() async {
+        let sys = FakeWindowSystem()
+        sys.addApp(10, "Slow", windows: [(1, .zero)])
+        sys.listBehaviour[10] = .throwTimes(5)          // answers on the 6th try
+        let tally = await runPatient(sys, pid: 10, wanted: [1: true], for: 2)
+        XCTAssertEqual(tally.moved, 1)
+        XCTAssertEqual(sys.listCalls[10], 6)
+    }
+
+    func testPatientRetriesUntilDeadlineThenGivesUp() async {
+        let sys = FakeWindowSystem()
+        sys.addApp(10, "Hung", windows: [(1, .zero)])
+        sys.listBehaviour[10] = .throwAlways
+        let tally = await runPatient(sys, pid: 10, wanted: [1: true], for: 0.6)
+        XCTAssertEqual(tally.skipped, ["Hung"])
+        XCTAssertEqual(Set(tally.missed[10]?.keys ?? [:].keys), [1])
+        XCTAssertLessThanOrEqual(sys.listCalls[10] ?? 0, 6, "waits grow: never a tight loop")
+    }
+
+    func testRefusedWindowRetriedWithinPatience() async {
+        let sys = FakeWindowSystem()
+        sys.addApp(10, "Fake", windows: [(1, .zero), (2, .zero)])
+        sys.failSet = [2]
+        Task { try? await Task.sleep(nanoseconds: 150_000_000); sys.locked { sys.failSet = [] } }
+        let tally = await runPatient(sys, pid: 10, wanted: [1: true, 2: true], for: 2)
+        XCTAssertEqual(tally.moved, 2)
+        XCTAssertTrue(tally.refused.isEmpty)
+    }
+
+    func testRefusedAfterPatienceCountsAsMissed() async {
+        let sys = FakeWindowSystem()
+        sys.addApp(10, "Fake", windows: [(1, .zero), (2, .zero)])
+        sys.failSet = [2]
+        let tally = await runPatient(sys, pid: 10, wanted: [1: true, 2: true], for: 0.3)
+        XCTAssertEqual(Set(tally.refused[10]?.keys ?? [:].keys), [2])
+        XCTAssertEqual(Set(tally.missed[10]?.keys ?? [:].keys), [2])
+        XCTAssertEqual(reportText("Moved 1 window", skipped: [], hasMissed: true, problem: nil, refused: 1),
+                       "Moved 1 window\n(1 window refused to move)\nRetry from the ⧉ menu")
+    }
+
     func testLogsWhyWantedWindowsDidNotMove() async throws {
         let file = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".log")
         let saved = Log.fileURL

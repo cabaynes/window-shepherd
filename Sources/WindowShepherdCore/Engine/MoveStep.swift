@@ -8,6 +8,8 @@ public final class Tally<V> {
     public var skipped: [String] = []
     public var ids = Set<String>()
     public var missed: [pid_t: [UInt32: V]] = [:]
+    /// Windows whose move the app refused (an AX error) every time it was asked; also in `missed`.
+    public var refused: [pid_t: [UInt32: V]] = [:]
     var waiting: [pid_t: (name: String, wanted: [UInt32: V])] = [:]
 
     public init() {}
@@ -33,12 +35,32 @@ public struct MoveTiming {
     public var listSlow: TimeInterval = 0.4
     /// Seconds before the 2nd and 3rd try of an app that didn't answer.
     public var retryWaits: [TimeInterval] = [2, 4]
+    /// With a patience deadline, later waits double from the last of `retryWaits`, up to this.
+    public var maxWait: TimeInterval = 16
+    /// How long a bulk move keeps retrying apps that are slow or refuse.
+    public var movePatience: TimeInterval = 30
 
-    public init(windowLimit: TimeInterval = 1.5, listSlow: TimeInterval = 0.4, retryWaits: [TimeInterval] = [2, 4]) {
-        self.windowLimit = windowLimit; self.listSlow = listSlow; self.retryWaits = retryWaits
+    public init(windowLimit: TimeInterval = 1.5, listSlow: TimeInterval = 0.4, retryWaits: [TimeInterval] = [2, 4],
+                movePatience: TimeInterval = 30) {
+        self.windowLimit = windowLimit; self.listSlow = listSlow; self.retryWaits = retryWaits; self.movePatience = movePatience
     }
 
     public static let standard = MoveTiming()
+
+    /// The wait before try `n + 1`, or nil to give up. Without a deadline:
+    /// `retryWaits`, then stop. With one: keep going, waits growing, while
+    /// the next try still starts before it.
+    func wait(afterTry n: Int, until: Date?) -> TimeInterval? {
+        let w: TimeInterval
+        if n <= retryWaits.count {
+            w = retryWaits[n - 1]
+        } else {
+            guard until != nil else { return nil }
+            w = min(maxWait, (retryWaits.last ?? 1) * pow(2, Double(n - retryWaits.count)))
+        }
+        if let until, Date().addingTimeInterval(w) >= until { return nil }
+        return w
+    }
 }
 
 /// A job step that pauses the job until `secs` from now (nothing is held).
@@ -55,14 +77,16 @@ private final class Flag { var on = false }
 /// fine. An app is "not responding" only if listing its windows fails (or
 /// comes back empty after `listSlow`), or one window takes over
 /// `windowLimit`; then we stop on that app, wait (`retryWaits`) and try its
-/// remaining windows again at the end of the job. The Hammerspoon log showed
+/// remaining windows again at the end of the job. Windows the app refuses to
+/// move get the same retries. With `patientUntil`, retries go on (waits
+/// growing to `maxWait`) until that time instead of stopping after `retryWaits`. The Hammerspoon log showed
 /// 43 of 48 skipped apps answering seconds later: busy, not hung.
 ///
 /// `action` runs on the worker; `gate` (main) can veto the rest of the job and
 /// `skip` (main) one window, just before it moves; `onMoved` (main) records a success.
 @MainActor
 public func appStep<V>(pid: pid_t, wanted: [UInt32: V], system: WindowSystem, worker: AXWorker, timing: MoveTiming,
-                       tally: Tally<V>, try attempt: Int = 1, partly: Bool = false,
+                       tally: Tally<V>, try attempt: Int = 1, partly: Bool = false, patientUntil: Date? = nil,
                        gate: @escaping @MainActor () -> Bool = { true },
                        skip: @escaping @MainActor (UInt32) -> Bool = { _ in false },
                        action: @escaping (WindowHandle, V) throws -> Void,
@@ -77,13 +101,13 @@ public func appStep<V>(pid: pid_t, wanted: [UInt32: V], system: WindowSystem, wo
             let rest = wanted.filter { !done.contains($0.key) }
             guard !rest.isEmpty else { return }
             let wasPartly = partly || tally.moved > movedBefore
-            if attempt <= timing.retryWaits.count {
-                let wait = timing.retryWaits[attempt - 1]
+            if let wait = timing.wait(afterTry: attempt, until: patientUntil) {
                 Log.info("\(name) not responding (\(why)), trying again in \(Int(wait.rounded()))s")
                 tally.waiting[pid] = (name, rest)
                 ctx.append(waitStep(wait))
                 ctx.append(appStep(pid: pid, wanted: rest, system: system, worker: worker, timing: timing, tally: tally,
-                                   try: attempt + 1, partly: wasPartly, gate: gate, skip: skip, action: action, onMoved: onMoved))
+                                   try: attempt + 1, partly: wasPartly, patientUntil: patientUntil,
+                                   gate: gate, skip: skip, action: action, onMoved: onMoved))
                 return
             }
             tally.skipped.append(wasPartly ? name + ", partly" : name)
@@ -106,6 +130,7 @@ public func appStep<V>(pid: pid_t, wanted: [UInt32: V], system: WindowSystem, wo
         let found = Set(listed.compactMap(\.0)).intersection(wanted.keys)
         var yours = 0
         var refused: [Int32] = []   // AX error codes of moves that failed
+        var refusedIDs = Set<UInt32>()
         for (maybeID, win) in listed {
             guard let id = maybeID, let value = wanted[id] else { continue }
             pos += 1
@@ -117,7 +142,7 @@ public func appStep<V>(pid: pid_t, wanted: [UInt32: V], system: WindowSystem, wo
                     do { try action(win, value); return nil } catch { return (error as? AXFailure)?.code ?? 0 }
                 }
                 let ok = error == nil
-                if let error { refused.append(error) }
+                if let error { refused.append(error); refusedIDs.insert(id) }
                 guard gate() else { return nil }   // the screens changed meanwhile: it belongs to the old setup
                 if ok {
                     done.insert(id)
@@ -140,6 +165,18 @@ public func appStep<V>(pid: pid_t, wanted: [UInt32: V], system: WindowSystem, wo
             if yours > 0 { line += ", \(yours) left where you put them" }
             if !refused.isEmpty { line += ", \(refused.count) refused (AX \(refused.map(String.init).joined(separator: " ")))" }
             Log.info(line)
+            let again = wanted.filter { refusedIDs.contains($0.key) }
+            guard !again.isEmpty else { return nil }
+            if let wait = timing.wait(afterTry: attempt, until: patientUntil) {
+                tally.waiting[pid] = (name, again)
+                ctx.append(waitStep(wait))
+                ctx.append(appStep(pid: pid, wanted: again, system: system, worker: worker, timing: timing, tally: tally,
+                                   try: attempt + 1, partly: partly || !done.isEmpty, patientUntil: patientUntil,
+                                   gate: gate, skip: skip, action: action, onMoved: onMoved))
+            } else {
+                tally.refused[pid, default: [:]].merge(again) { a, _ in a }
+                tally.missed[pid, default: [:]].merge(again) { a, _ in a }
+            }
             return nil
         }, at: pos + 1)
         return nil
@@ -147,12 +184,13 @@ public func appStep<V>(pid: pid_t, wanted: [UInt32: V], system: WindowSystem, wo
 }
 
 /// The on-screen message for a finished job.
-public func reportText(_ head: String, skipped: [String], hasMissed: Bool, problem: JobProblem?) -> String {
+public func reportText(_ head: String, skipped: [String], hasMissed: Bool, problem: JobProblem?, refused: Int = 0) -> String {
     var msg = head
     if !skipped.isEmpty {
         msg += "\n(skipped, not responding: " + skipped.joined(separator: ", ") + ")"
-        if hasMissed { msg += "\nRetry from the ⧉ menu" }
     }
+    if refused > 0 { msg += "\n(\(refused) window\(refused == 1 ? "" : "s") refused to move)" }
+    if hasMissed && (!skipped.isEmpty || refused > 0) { msg += "\nRetry from the ⧉ menu" }
     if problem == .outOfTime { msg += "\n(stopped: took too long)" }
     if problem == .interrupted { msg += "\n(interrupted by a newer move)" }
     return msg

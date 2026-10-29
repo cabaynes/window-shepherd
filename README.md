@@ -16,7 +16,9 @@ Unplug your external monitor and macOS piles every window onto the laptop screen
 ### Puts your windows back when the screens change
 
 - Remembers every window's spot **per screen setup** ("laptop only", "laptop + Dell", "laptop + the office LG"), keyed by each display's hardware ID, so two identical monitors are still told apart.
-- When the setup changes, in either direction, it puts each window back where it last was for that setup: at 3, 10 and 20 seconds, for apps that are slow to wake up.
+- When the setup changes, in either direction, it puts each window back where it last was for that setup: at 3, 10 and 20 seconds, and it keeps retrying apps that are slow to answer (common on a Mac short of memory) for up to a minute.
+- **Revert.** When you unplug, it keeps a frozen copy of how that setup looked. If a replug still leaves windows behind, the ⧉ flashes red until you open the menu, and the top row offers **Put back 4 windows as they were at 7:36 AM**: one click puts every window back as it was before you unplugged. The row is there only while some windows are out of place, until the next screen change. A bad replug or a flickering screen never overwrites the frozen copy.
+- **Windows opened while undocked** have no spot on the monitor yet. When you plug back in they go to the biggest screen at 90%, centered. Pick another screen or size, or turn it off, in **⧉ → Customize shortcuts…**.
 - It never fights you. If you move a window while it's restoring, it leaves that window alone.
 - A spot is recorded only after it's been seen twice, 2 seconds apart. So the moment mid-unplug, when macOS shoves everything aside, is never saved as "home".
 - Windows that are minimized, hidden or on another Space are kept for 30 days rather than forgotten.
@@ -68,12 +70,12 @@ The rule this app is built around: **nothing may hang or slow the Mac.** Window 
 
 - **The menu and the auto-restore memory never talk to apps.** They read macOS's window list (CoreGraphics), which takes a few hundredths of a second and can't block on a hung app. Only moves and restores talk to apps, and only to apps that have a window on screen. The one exception is the clash check while Customize Shortcuts is open, which reads open apps' menus, time-boxed to 0.4 s per app and 3 s in all.
 - **Every question to an app times out after 0.5 s**, and the main thread never asks. All Accessibility calls run on background queues, so the menu, the shortcuts and the ⧉ icon stay responsive whatever other apps are doing.
-- **"Busy" isn't "hung".** Safari can take 0.3–0.4 s to resize a window while it re-lays out pages. An app is called "not responding" only if it can't even list its windows, or one window takes over 1.5 s. It's then retried 2 s and 4 s later, and named, not dropped silently. For two minutes afterwards, the menu offers "Retry N windows that didn't move".
+- **"Busy" isn't "hung".** Safari can take 0.3–0.4 s to resize a window while it re-lays out pages. An app is called "not responding" only if it can't even list its windows, or one window takes over 1.5 s. It's then retried with growing waits (2 s, 4 s, 8 s…) for up to a minute after a screen change, or 30 s for a move you asked for, and named if it still fails, not dropped silently. Windows an app refuses to move are retried the same way. Until your next move or screen change, the menu offers "Retry N windows that didn't move".
 - **Work is done one window at a time** with a hard deadline per job. A new move interrupts an old one, and a keyboard snap never waits behind a restore. Each app has its own lane, so a hung app delays only itself.
 - **The only polling is a cheap 2-second check** of the screen setup. It reads the window list only, which also catches screen changes macOS forgot to announce (after sleep, for example). The one other timer is a once-a-second permission check, and it runs only while the first-run window is open.
-- **The ⧉ turns red** while a move or restore is running, so you know when to keep your hands off.
+- **The ⧉ turns red** while a move or restore is running, so you know when to keep your hands off. It flashes red when a restore has finished but left windows behind (steady red with Reduce motion on).
 
-The engine is covered by more than 140 unit tests. They include a fake "hung app" that must not delay the main thread or other apps, screens unplugged mid-move, and restores you interrupt by moving a window yourself.
+The engine is covered by more than 200 unit tests. They include a fake "hung app" that must not delay the main thread or other apps, screens unplugged mid-move, and restores you interrupt by moving a window yourself.
 
 ## Install
 

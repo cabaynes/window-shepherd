@@ -33,6 +33,19 @@ public struct CGWindow: Equatable {
         }
     }
 
+    /// Ids of every normal (layer 0) window that exists, on screen or not.
+    public static func allIDs(excludingPID: pid_t? = getpid()) -> Set<UInt32> {
+        let opts: CGWindowListOption = [.optionAll, .excludeDesktopElements]
+        let list = CGWindowListCopyWindowInfo(opts, kCGNullWindowID) as? [[String: Any]] ?? []
+        var ids = Set<UInt32>()
+        for w in list where (w[kCGWindowLayer as String] as? Int) == 0 {
+            guard let id = (w[kCGWindowNumber as String] as? NSNumber)?.uint32Value,
+                  (w[kCGWindowOwnerPID as String] as? NSNumber)?.int32Value != excludingPID else { continue }
+            ids.insert(id)
+        }
+        return ids
+    }
+
     public static func current(excludingPID: pid_t? = getpid()) -> [CGWindow] {
         let opts: CGWindowListOption = [.optionOnScreenOnly, .excludeDesktopElements]
         let list = CGWindowListCopyWindowInfo(opts, kCGNullWindowID) as? [[String: Any]] ?? []

@@ -19,6 +19,8 @@ public struct AXFailure: Error, Equatable {
 /// the Accessibility timeout and must run on an `AXWorker`.
 public protocol WindowSystem: AnyObject {
     func visibleWindows() -> [CGWindow]          // main
+    /// Every normal window that exists, on any Space or minimized (to forget closed ones).
+    func allWindowIDs() -> Set<UInt32>           // main
     func screens() -> [ScreenInfo]               // main
     func mainScreen() -> ScreenInfo?             // main
     func frontmostPID() -> pid_t?                // main

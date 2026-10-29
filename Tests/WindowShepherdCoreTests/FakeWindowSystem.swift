@@ -11,7 +11,7 @@ final class FakeWindowSystem: WindowSystem {
         unowned let sys: FakeWindowSystem
         init(_ id: UInt32, _ sys: FakeWindowSystem) { self.id = id; self.sys = sys }
         var windowID: UInt32? { sys.locked { sys.unreadableIDs.contains(id) } ? nil : id }
-        func frame() -> CGRect? { sys.locked { sys.windowsByID[id]?.frame } }
+        func frame() -> CGRect? { sys.locked { sys.noFrame.contains(id) ? nil : sys.windowsByID[id]?.frame } }
         func setFrame(_ r: CGRect) throws {
             let delay = sys.locked { sys.setDelay[id] ?? 0 }
             if delay > 0 { Thread.sleep(forTimeInterval: delay) }
@@ -44,6 +44,8 @@ final class FakeWindowSystem: WindowSystem {
     var framesSet: [(UInt32, CGRect)] = []
     var activated: [pid_t] = []
     var listCalls: [pid_t: Int] = [:]
+    var offSpace: Set<UInt32> = []
+    var noFrame: Set<UInt32> = []                // frame() fails for these (the app didn't answer)               // exist (another Space, minimized) but aren't on screen
 
     var windowsByID: [UInt32: CGWindow] { Dictionary(uniqueKeysWithValues: windows.map { ($0.id, $0) }) }
 
@@ -59,6 +61,7 @@ final class FakeWindowSystem: WindowSystem {
 
     // MARK: WindowSystem
     func visibleWindows() -> [CGWindow] { locked { windows } }
+    func allWindowIDs() -> Set<UInt32> { locked { Set(windows.map(\.id)).union(offSpace) } }
     func screens() -> [ScreenInfo] { locked { allScreens } }
     func mainScreen() -> ScreenInfo? { locked { main ?? allScreens.first } }
     func frontmostPID() -> pid_t? { locked { front } }

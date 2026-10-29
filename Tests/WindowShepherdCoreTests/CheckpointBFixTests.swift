@@ -9,7 +9,7 @@ final class CheckpointBFixTests: XCTestCase {
         sys.listBehaviour[10] = .throwAlways
         let store = LayoutStore(url: FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".json"))
         var alerts: [String] = []
-        let s = Shepherd(system: sys, store: store, timing: MoveTiming(retryWaits: [0.01, 0.02]))
+        let s = Shepherd(system: sys, store: store, timing: MoveTiming(retryWaits: [0.01, 0.02], movePatience: 0.1))
         s.onAlert = { alerts.append($0) }
         s.start()
         s.apply(.everything, placer: .fraction(1, on: .own), label: "Full screen")

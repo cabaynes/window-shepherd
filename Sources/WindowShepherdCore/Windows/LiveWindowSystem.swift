@@ -101,6 +101,7 @@ public final class LiveWindowSystem: WindowSystem {
     }
 
     public func visibleWindows() -> [CGWindow] { CGWindow.current() }
+    public func allWindowIDs() -> Set<UInt32> { CGWindow.allIDs() }
     public func screens() -> [ScreenInfo] { Screens.live() }
     public func mainScreen() -> ScreenInfo? { Screens.main(in: Screens.live()) }
     public func frontmostPID() -> pid_t? { NSWorkspace.shared.frontmostApplication?.processIdentifier }
