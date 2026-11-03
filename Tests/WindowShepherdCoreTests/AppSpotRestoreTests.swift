@@ -136,6 +136,45 @@ final class AppSpotRestoreTests: XCTestCase {
         XCTAssertFalse(log().contains("opened while undocked"), log())
     }
 
+    /// Opened while undocked; at plug-in macOS happens to put it right at its app's Dell spot.
+    func alreadyInItsSpotAtPlugIn() async -> Shepherd {
+        let s = make(spots: [dockedKey: ["test.Safari": [AppSpot(id: "D", scr: dell.uuid, unit: sixty, used: used)]]])
+        s.tick()
+        sys.allScreens = [lap]
+        s.screensChanged()
+        await waitUntil { !s.isBusy }
+        addApp(10, "Safari", windows: [(7, rect(40))])
+        await learnKind(s, 7)
+        sys.allScreens = [lap, dell]
+        move(7, to: Geometry.place(sixty, in: dell.frame))
+        s.tick()
+        await waitUntil(4) { !s.isBusy }
+        XCTAssertEqual(sys.setCount(7), 0, "already there: not moved")
+        XCTAssertTrue(s.spots.holds(key: dockedKey, window: "7"))
+        return s
+    }
+
+    func testAlreadyInItsSpotStaysThereOnRestoreNow() async {
+        let s = await alreadyInItsSpotAtPlugIn()
+        s.restoreNow()
+        await waitUntil(4) { !s.isBusy }
+        XCTAssertEqual(sys.setCount(7), 0, "never given the undocked default")
+        XCTAssertEqual(s.spots.spots[dockedKey]?["test.Safari"]?.count, 1, "no spot added")
+        XCTAssertTrue(Geometry.sameSpot(s.spots.spots[dockedKey]?["test.Safari"]?.first?.spot, Spot(scr: dell.uuid, unit: sixty)),
+                      "the spot is unchanged")
+    }
+
+    func testAlreadyInItsSpotStaysThereOnRevert() async {
+        let s = await alreadyInItsSpotAtPlugIn()
+        s.book.frozen[dockedKey] = FrozenCopy(layout: [:], at: used)
+        s.revert()
+        await waitUntil(4) { !s.isBusy }
+        XCTAssertEqual(sys.setCount(7), 0, "never given the undocked default")
+        XCTAssertEqual(s.spots.spots[dockedKey]?["test.Safari"]?.count, 1, "no spot added")
+        XCTAssertTrue(Geometry.sameSpot(s.spots.spots[dockedKey]?["test.Safari"]?.first?.spot, Spot(scr: dell.uuid, unit: sixty)),
+                      "the spot is unchanged")
+    }
+
     func testPlugInUndockedDefaultForAppWithoutSpots() async {
         let s = make()
         await openWhileUndockedThenPlugIn(s, pid: 30, app: "Notes", id: 7)

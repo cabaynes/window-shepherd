@@ -143,6 +143,7 @@ extension Shepherd {
                 let at = Geometry.whereIs(w.frame, in: screens)
                 if Geometry.sameSpot(at, spot.spot) {          // already there: nothing to move
                     book.restoredIds.insert(id)
+                    book.homeless.remove(id)                   // its app's spot came first: never the undocked default
                     continue
                 }
                 spots.holders[key]?[id] = nil                  // held once it's in the spot
