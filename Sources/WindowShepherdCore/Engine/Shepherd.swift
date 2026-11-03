@@ -74,6 +74,8 @@ public final class Shepherd {
     /// Of those: ticks spent waiting for the kind, and when each was ready while a job ran.
     var newKindWaits: [String: Int] = [:]
     var newReadyAt: [String: Double] = [:]
+    /// Of those: how often the app moved it before it settled.
+    var newResets: [String: Int] = [:]
     /// Windows never placed as new: open before they could be, or left once. Runtime only.
     var notNew = Set<String>()
     /// New windows you dragged before they could be placed: their first recording becomes a spot.
@@ -387,11 +389,16 @@ public final class Shepherd {
         let saved = frozenStore.load()
         book.frozen = saved.copies
         if let k = saved.lastChangeKey, let at = saved.lastChangeAt { lastChange = (k, at) }
+        let running = system.runningApps()
         if let loaded = spotStore.load() {
             spots.spots = loaded
         } else {
+            var bundleByName: [String: String?] = [:]   // looked up once per app, not per entry
             let seeded = AppSpotBook.seed(layouts: book.layouts, frozen: book.frozen, bundleFor: { [system] e in
-                system.runningApps()[pid_t(e.pid)] == e.app ? system.bundleID(pid: pid_t(e.pid)) : system.bundleID(appName: e.app)
+                if let known = bundleByName[e.app] { return known }
+                let bundle = running[pid_t(e.pid)] == e.app ? system.bundleID(pid: pid_t(e.pid)) : system.bundleID(appName: e.app)
+                bundleByName.updateValue(bundle, forKey: e.app)
+                return bundle
             }, now: nowSeconds)
             spots.spots = seeded
             spotStore.save(seeded)
@@ -399,7 +406,8 @@ public final class Shepherd {
             let apps = Set(seeded.values.flatMap { $0.keys }).count
             Log.info("app spots: seeded \(n) spots for \(apps) apps from the remembered layouts")
         }
-        book.prune(running: system.runningApps())
+        book.prune(running: running)
+        holdOpenWindows()
         let key = Screens.setupKey(system.screens())
         book.lastSetup = key
         noteNewAtStart(key: key)

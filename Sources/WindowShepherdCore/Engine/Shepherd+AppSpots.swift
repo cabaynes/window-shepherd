@@ -94,11 +94,14 @@ extension Shepherd {
     static let newKindWaitLimit = 3
     /// Seconds a ready new window waits for a running job before it's left where it is.
     static let newJobWait: Double = 10
+    /// Times a new window the app moves by itself starts settling again before it's left.
+    static let newResetLimit = 3
 
     /// Each settled tick, before the snapshot (and while a job runs, so new windows are
     /// still sighted). A window's first sighting is noted. At its next one, if it sat still
     /// and it's a main window, it goes to a free spot for its app (a click into it doesn't
-    /// stop that; a move does). Anything else leaves it where it is, for good.
+    /// stop that; a drag does). One the app moved by itself waits to settle again (at most
+    /// `newResetLimit` times). Anything else leaves it where it is, for good.
     func placeNewWindows(visible: [CGWindow], screens: [ScreenInfo], key: String) {
         let previous = previousSighting
         previousSighting = visible
@@ -126,10 +129,22 @@ extension Shepherd {
                 continue
             }
             if handled(id) { leaveFirstSeen(id); continue }   // placed or remembered meanwhile
-            guard Geometry.sameSpot(Geometry.whereIs(w.frame, in: screens), first.at) else {
-                // Moved: with the mouse, you placed it (yours, and a spot); without, the app did.
-                if let mouse, mouse > first.tick { draggedNew.insert(id) }
-                leaveFirstSeen(id)
+            let here = Geometry.whereIs(w.frame, in: screens)
+            guard Geometry.sameSpot(here, first.at) else {
+                // Moved with the mouse: you placed it (yours, and a spot).
+                if let mouse, mouse > first.tick {
+                    draggedNew.insert(id)
+                    leaveFirstSeen(id)
+                    continue
+                }
+                // Without: the app is settling it; this is its first sighting again, a few times.
+                let resets = (newResets[id] ?? 0) + 1
+                if let here, resets <= Self.newResetLimit {
+                    firstSeen[id] = (here, t)
+                    newResets[id] = resets
+                } else {
+                    leaveFirstSeen(id)
+                }
                 continue
             }
             switch isMainWindow(id) {
@@ -162,12 +177,17 @@ extension Shepherd {
         firstSeen[id] = nil
         newKindWaits[id] = nil
         newReadyAt[id] = nil
+        newResets[id] = nil
         notNew.insert(id)
     }
 
     /// Ready new windows, grouped by app, into its free spots: one `.place` job.
     /// Windows with no free spot (or no bundle ID) are left where the app put them.
     func placeNew(_ windows: [CGWindow], screens: [ScreenInfo], key: String) {
+        // Closed windows free their spots first: a ⌘W then ⌘N, or a quit and reopen, comes
+        // sooner than the next `forgetSpots`.
+        let existing = system.allWindowIDs()
+        if !existing.isEmpty { spots.release(existing: existing) }
         var byBundle: [String: [CGWindow]] = [:]
         for w in windows where !spots.holds(key: key, window: String(w.id)) {
             guard let bundle = system.bundleID(pid: w.pid) else { continue }
@@ -268,6 +288,22 @@ extension Shepherd {
                   Geometry.sameSpot(book.layouts[key]?[id]?.spot, Geometry.whereIs(w.frame, in: screens)) else { continue }
             draggedNew.remove(id)
             recordSpot(w, key: key, screens: screens)
+        }
+    }
+
+    /// At launch: holders aren't saved, so each open window takes back the spot its
+    /// per-window entry puts it in (in every setup), or ⌘N would stack onto it.
+    func holdOpenWindows() {
+        let open = system.allWindowIDs()
+        guard !open.isEmpty else { return }
+        var bundles: [pid_t: String?] = [:]
+        for (key, layout) in book.layouts {
+            for (id, e) in layout.sorted(by: { $0.key < $1.key }) where UInt32(id).map(open.contains) == true {
+                let pid = pid_t(e.pid)
+                if bundles[pid] == nil { bundles.updateValue(system.bundleID(pid: pid), forKey: pid) }
+                guard let bundle = bundles[pid] ?? nil else { continue }
+                spots.hold(key: key, bundle: bundle, window: id, at: e.spot)
+            }
         }
     }
 

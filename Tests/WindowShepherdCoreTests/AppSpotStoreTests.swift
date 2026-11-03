@@ -94,4 +94,15 @@ final class AppSpotStoreTests: XCTestCase {
         XCTAssertTrue(log.contains("app spots were damaged; starting from the remembered layouts"))
         XCTAssertTrue(log.contains("app spots: seeded 1 spots for 1 apps from the remembered layouts"))
     }
+
+    /// Seeding runs before quit apps' entries are pruned: those apps are found by name.
+    func testStartSeedsAppsThatAreNotRunning() {
+        sys.bundleByName = ["Notes": "test.Notes"]
+        store.save([setup: ["1": entry(77, "Notes", x: 0, seen: 5), "2": entry(78, "Gone", x: 0.5, seen: 6)]])
+        store.flush()
+        let s = make()
+        XCTAssertEqual(s.spots.spots[setup]?["test.Notes"]?.count, 1)
+        XCTAssertEqual(s.spots.spots[setup]?.count, 1, "an app found by no name is dropped")
+        XCTAssertNil(s.book.layouts[setup]?["1"], "then its per-window entry is pruned")
+    }
 }

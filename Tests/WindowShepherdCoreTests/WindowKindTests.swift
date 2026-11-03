@@ -77,7 +77,7 @@ final class WindowKindTests: XCTestCase {
 
     func testUnreadableKindPromotedAfterThreeMisses() async {
         sys.addApp(10, "Safari", windows: [(1, r)])
-        sys.hiddenFromAX = [1]
+        sys.unreadableKind = [1]
         let s = make()
         for _ in 0..<2 {
             s.tick()
@@ -86,6 +86,31 @@ final class WindowKindTests: XCTestCase {
         XCTAssertNil(s.kinds["1"])
         s.tick()
         await waitUntil { s.kinds["1"] != nil }
+        XCTAssertEqual(s.kinds["1"], true)
+    }
+
+    /// A sheet: in the CoreGraphics list, not in the app's window list.
+    func testSheetIsNeverAMainWindow() async {
+        sys.addApp(10, "Safari", windows: [(1, r), (2, CGRect(x: 300, y: 150, width: 500, height: 300))])
+        sys.hiddenFromAX = [2]
+        let s = make()
+        for _ in 0..<6 {
+            s.tick()
+            await waitUntil { s.kindsInFlight.isEmpty }
+        }
+        XCTAssertEqual(s.isMainWindow("1"), true)
+        XCTAssertEqual(s.isMainWindow("2"), false)
+    }
+
+    /// The list has a window whose id can't be read: a missing one may be it, so it's a miss, not a dialog.
+    func testMissingWhileAnIdIsUnreadableIsAMiss() async {
+        sys.addApp(10, "Safari", windows: [(1, r)])
+        sys.unreadableIDs = [1]
+        let s = make()
+        for _ in 0..<3 {
+            s.tick()
+            await waitUntil { s.kindsInFlight.isEmpty }
+        }
         XCTAssertEqual(s.kinds["1"], true)
     }
 }

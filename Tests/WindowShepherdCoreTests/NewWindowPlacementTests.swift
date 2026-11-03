@@ -291,6 +291,106 @@ final class NewWindowPlacementTests: XCTestCase {
         XCTAssertEqual(sys.setCount(5), 0)
     }
 
+    func testRelaunchSoonAfterQuitFillsItsSpot() async {
+        addApp(10, "Safari", windows: [(1, dell90)])
+        addApp(30, "Finder", windows: [(3, rect(600))])
+        let s = make()
+        s.spots.record(key: key, bundle: "test.Safari", window: "1", at: Spot(scr: dell.uuid, unit: ninety), now: clock.timeIntervalSince1970)
+        await settle(s, 1)
+        XCTAssertTrue(s.spots.holds(key: key, window: "1"))
+        sys.locked { sys.windows.removeAll { $0.id == 1 }; sys.apps[10] = nil; sys.bundleOf[10] = nil }   // Safari quits
+        s.tick()
+        addApp(11, "Safari", windows: [(5, rect(100))], ago: 1)   // and reopens a few seconds later
+        await settle(s, 5)
+        s.tick()
+        await waitUntil { !s.isBusy }
+        XCTAssertEqual(sys.frameOf(5), dell90, "the spot its closed predecessor held")
+    }
+
+    func testCloseThenNewWindowFillsItsSpot() async {
+        addApp(10, "Safari", windows: [(1, dell90), (2, rect(150))])
+        let s = make()
+        s.spots.record(key: key, bundle: "test.Safari", window: "1", at: Spot(scr: dell.uuid, unit: ninety), now: clock.timeIntervalSince1970)
+        await settle(s, 1)
+        close(1)                                          // ⌘W
+        s.tick()
+        addApp(10, "Safari", windows: [(5, rect(100))])   // ⌘N
+        await settle(s, 5)
+        XCTAssertEqual(sys.frameOf(5), dell90)
+    }
+
+    /// Window Shepherd relaunches (an update, a crash): Safari's one window sits in its only spot.
+    func testRelaunchOfWindowShepherdKeepsOccupiedSpotsTaken() async {
+        addApp(10, "Safari", windows: [(1, dell90)])
+        addApp(30, "Finder", windows: [(3, rect(600))])
+        store.save([key: ["1": LayoutEntry(pid: 10, app: "Safari", scr: dell.uuid, unit: ninety, seen: clock.timeIntervalSince1970)]])
+        store.flush()
+        spotStore.save([key: ["test.Safari": [AppSpot(id: "A", scr: dell.uuid, unit: ninety, used: clock.timeIntervalSince1970)]]])
+        spotStore.flush()
+        let s = make()
+        XCTAssertTrue(s.spots.holds(key: key, window: "1"), "held again at launch")
+        await settle(s, 1)
+        addApp(10, "Safari", windows: [(5, rect(100))])   // ⌘N
+        await settle(s, 5)
+        XCTAssertEqual(sys.frameOf(5), rect(100), "not stacked onto the spot window 1 is sitting in")
+    }
+
+    /// The app repositions its own new window between sightings (no mouse): it still settles and is placed.
+    func testAppSettlingItsOwnWindowIsStillPlaced() async {
+        let s = make()
+        seedFreeSpot(s, ninety, on: dell)
+        addApp(10, "Safari", windows: [(5, rect(100))], ago: 1)
+        s.tick()
+        await waitUntil { s.isMainWindow("5") != nil }
+        sys.locked {
+            let i = sys.windows.firstIndex { $0.id == 5 }!
+            sys.windows[i] = CGWindow(id: 5, pid: 10, app: "Safari", title: "Doc", frame: rect(200))
+        }
+        for _ in 0..<3 {
+            s.tick()
+            await waitUntil { !s.isBusy }
+        }
+        XCTAssertEqual(sys.frameOf(5), dell90)
+    }
+
+    func testWindowTheAppKeepsMovingIsLeftAfterThreeResets() async {
+        let s = make()
+        seedFreeSpot(s, ninety, on: dell)
+        addApp(10, "Safari", windows: [(5, rect(100))], ago: 1)
+        s.tick()
+        await waitUntil { s.isMainWindow("5") != nil }
+        for x in [200, 300, 400, 500] as [CGFloat] {   // a new spot at every sighting
+            sys.locked {
+                let i = sys.windows.firstIndex { $0.id == 5 }!
+                sys.windows[i] = CGWindow(id: 5, pid: 10, app: "Safari", title: "Doc", frame: rect(x))
+            }
+            s.tick()
+            await waitUntil { !s.isBusy }
+        }
+        XCTAssertTrue(s.notNew.contains("5"), "left for good")
+        for _ in 0..<3 {   // it stops moving: still never placed
+            s.tick()
+            await waitUntil { !s.isBusy }
+        }
+        XCTAssertEqual(sys.frameOf(5), rect(500))
+        XCTAssertEqual(sys.setCount(5), 0)
+    }
+
+    func testScreenChangeForgetsNewWindowsYouDragged() async {
+        let s = make()
+        seedFreeSpot(s, ninety, on: dell)
+        addApp(10, "Safari", windows: [(5, rect(100))], ago: 1)
+        s.tick()
+        await waitUntil { s.isMainWindow("5") != nil }
+        drag(5, to: rect(1500))
+        s.tick()
+        XCTAssertTrue(s.draggedNew.contains("5"))
+        sys.allScreens = [lap]
+        s.screensChanged()
+        XCTAssertTrue(s.draggedNew.isEmpty, "where macOS puts it now isn't your spot")
+        await waitUntil { !s.isBusy }
+    }
+
     func testUnitLabel() {
         XCTAssertEqual(Shepherd.unitLabel(ninety), "90% centered")
         XCTAssertEqual(Shepherd.unitLabel(full), "Full screen")

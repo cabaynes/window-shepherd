@@ -50,6 +50,7 @@ extension Shepherd {
             store.save(book.layouts)
             retryOffer = nil   // its targets were for the old setup
             for id in firstSeen.keys { leaveFirstSeen(id) }   // macOS is moving windows now: the restore's job
+            draggedNew = []                                   // and where it puts them isn't yours
             setFlashing(false)
             resumeRestore = false   // that restore was for the old setup
             if let job = runner.current {   // it was moving/restoring for the old setup: stop it

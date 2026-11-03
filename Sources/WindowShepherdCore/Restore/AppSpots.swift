@@ -126,6 +126,14 @@ public final class AppSpotBook {
         return result
     }
 
+    /// An open window takes an unheld spot of its app that's at `spot` (holders aren't saved,
+    /// so at launch the spots open windows sit in would look free).
+    public func hold(key: String, bundle: String, window: String, at spot: Spot) {
+        guard holders[key]?[window] == nil,
+              let s = spots[key]?[bundle]?.first(where: { !isHeld($0.id, key: key) && Geometry.sameSpot($0.spot, spot) }) else { return }
+        holders[key, default: [:]][window] = s.id
+    }
+
     /// True if the window holds a spot in this setup.
     public func holds(key: String, window: String) -> Bool {
         holders[key]?[window] != nil

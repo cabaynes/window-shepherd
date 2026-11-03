@@ -187,4 +187,44 @@ final class AppSpotRecordingTests: XCTestCase {
         XCTAssertEqual(list.count, 1)
         XCTAssertTrue(Geometry.sameSpot(list.first?.spot, Spot(scr: dell.uuid, unit: ninety)), "\(list)")
     }
+
+    /// Its sheet moves with the window you drag; only the window is a spot.
+    func testDraggingAWindowWithASheetMakesNoSpotForTheSheet() async {
+        let sheet = CGRect(x: 1500, y: 150, width: 500, height: 300)
+        addApp(10, "Safari", windows: [(1, Geometry.place(ninety, in: dell.frame)), (2, sheet)])
+        sys.hiddenFromAX = [2]
+        let s = make()
+        for _ in 0..<6 {
+            s.tick()
+            await waitUntil { !s.kindsInFlight.contains(10) }
+        }
+        sys.locked {
+            sys.mouseUsed = Date()
+            sys.windows = sys.windows.map { CGWindow(id: $0.id, pid: $0.pid, app: $0.app, title: $0.title, frame: $0.frame.offsetBy(dx: 0, dy: 40)) }
+        }
+        for _ in 0..<3 {
+            s.tick()
+            await waitUntil { !s.isBusy }
+        }
+        let list = spots(s, "Safari")
+        XCTAssertFalse(list.contains { Geometry.sameSpot($0.spot, place(sheet.offsetBy(dx: 0, dy: 40))) }, "\(list)")
+    }
+
+    /// After Window Shepherd relaunches, moving a window once replaces the spot it sat in.
+    func testMoveAfterRelaunchReplacesTheSpotItSatIn() async {
+        addApp(10, "Safari", windows: [(1, rect(100))])
+        let at = place(rect(100))
+        store.save([key: ["1": LayoutEntry(pid: 10, app: "Safari", scr: at.scr, unit: at.unit, seen: clock.timeIntervalSince1970)]])
+        store.flush()
+        spotStore.save([key: ["test.Safari": [AppSpot(id: "A", scr: at.scr, unit: at.unit, used: clock.timeIntervalSince1970)]]])
+        spotStore.flush()
+        let s = make()
+        s.tick()
+        await waitUntil { s.isMainWindow("1") != nil }
+        s.apply(Selection(pid: 10), placer: .fraction(0.9, on: .fixed(uuid: dell.uuid)), label: "DELL (90%)")
+        await waitUntil { !s.isBusy }
+        let list = spots(s, "Safari")
+        XCTAssertEqual(list.count, 1, "\(list)")
+        XCTAssertTrue(Geometry.sameSpot(list.first?.spot, Spot(scr: dell.uuid, unit: ninety)), "\(list)")
+    }
 }

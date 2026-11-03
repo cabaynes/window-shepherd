@@ -70,7 +70,11 @@ extension Shepherd {
             guard e.at >= book.changedAt, let w = byID[e.id] else { continue }   // closed, minimized, another Space
             // The mouse was used since: you may have dragged it, and where you put it is yours (the snapshot records it).
             if let mouse, mouse > e.movedAt { continue }
-            if !Self.landed(w.frame, wanted: e.wanted, resizable: e.resizable) { misses.append((e, w)) }
+            if !Self.landed(w.frame, wanted: e.wanted, resizable: e.resizable) {
+                misses.append((e, w))
+            } else if let last = lastRecorded[String(e.id)], last.at >= e.at {
+                recordSpot(w, key: key, screens: screens)   // its record read the list too soon (an app that applies frames late)
+            }
         }
         guard !misses.isEmpty else { return }
         var groups: [(retry: Landing.Retry, byPid: [pid_t: Set<UInt32>])] = []

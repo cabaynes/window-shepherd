@@ -413,4 +413,20 @@ final class LandingTests: XCTestCase {
         later(s); later(s)
         XCTAssertFalse(s.book.leftBehind.contains("1"), "its target was for the old setup")
     }
+
+    /// The window list read right after a move can still show the old frame (an app that applies
+    /// frames later): the spot follows where the check finds it.
+    func testSpotIsWhereTheMoveLandedNotTheFirstRead() async {
+        addApp(10, "Safari", windows: [(1, rect(100))], ago: 1)   // just launched: no snapshot records its spot
+        sys.staleFrameOnce = [1]
+        let s = make()
+        await learnKind(s, 1)
+        await snap(s)
+        later(s); later(s)
+        let landed = Geometry.whereIs(sys.frameOf(1)!, in: sys.screens())
+        XCTAssertFalse(Geometry.sameSpot(landed, Geometry.whereIs(rect(100), in: sys.screens())), "it moved")
+        let list = s.spots.spots[key]?["test.Safari"] ?? []
+        XCTAssertEqual(list.count, 1, "\(list)")
+        XCTAssertTrue(Geometry.sameSpot(list.first?.spot, landed), "\(list)")
+    }
 }

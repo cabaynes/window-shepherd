@@ -20,22 +20,26 @@ extension Shepherd {
             let system = self.system
             let worker = kindWorker
             Task { @MainActor [weak self] in
-                let answers: [UInt32: Bool?]? = await worker.run {
+                let answers: (kinds: [UInt32: Bool?], complete: Bool)? = await worker.run {
                     // A failed or timed-out list says nothing about the windows: record nothing.
                     guard let list = try? system.appWindows(pid: pid) else { return nil }
                     var out: [UInt32: Bool?] = [:]
+                    var complete = true   // every listed window's id was read
                     for h in list {
-                        if let id = h.windowID, ids.contains(id) { out[id] = h.isStandard }
+                        guard let id = h.windowID else { complete = false; continue }
+                        if ids.contains(id) { out[id] = h.isStandard }
                     }
-                    return out
+                    return (out, complete)
                 }
                 guard let self else { return }
                 self.kindsInFlight.remove(pid)
                 guard let answers else { return }
                 for id in ids {
                     let key = String(id)
-                    if let known = answers[id], let isStandard = known {
+                    if let known = answers.kinds[id], let isStandard = known {
                         self.kinds[key] = isStandard
+                    } else if answers.kinds[id] == nil && answers.complete {
+                        self.kinds[key] = false   // not in the app's own list: a sheet
                     } else {
                         // Unreadable: ask again on a later tick, then count it as a main window.
                         let misses = (self.kindMisses[key] ?? 0) + 1
