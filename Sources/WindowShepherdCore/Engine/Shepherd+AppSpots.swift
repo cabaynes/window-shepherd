@@ -59,9 +59,26 @@ extension Shepherd {
         spotsDirty = true                         // also saves the refreshed last-used times
     }
 
+    /// A move that didn't land: the spot record it made (at or after `since`) is undone,
+    /// so where it ended up never becomes a spot. A spot it held goes back where it was;
+    /// one the record added goes.
+    func undoSpotRecord(_ w: CGWindow, key: String, since: Double) {
+        let id = String(w.id)
+        guard let last = lastRecorded[id], last.at >= since, let bundle = system.bundleID(pid: w.pid) else { return }
+        lastRecorded[id] = nil
+        if let before = last.spot {
+            if let i = spots.spots[key]?[bundle]?.firstIndex(where: { $0.id == before.id }) { spots.spots[key]?[bundle]?[i] = before }
+        } else if let added = spots.holders[key]?[id] {
+            spots.spots[key]?[bundle]?.removeAll { $0.id == added }
+            spots.holders[key]?[id] = nil
+        }
+        spotsDirty = true
+    }
+
     /// Once per tick: save app spots if they changed, drop stale undo records.
     func spotsTick() {
         lastRecorded = lastRecorded.filter { nowSeconds - $0.value.at < Self.lastRecordedFor }
+        heldByRestore = heldByRestore.filter { nowSeconds - $0.value < Self.lastRecordedFor }
         guard spotsDirty else { return }
         spotsDirty = false
         spotStore.save(spots.spots)
@@ -172,6 +189,8 @@ extension Shepherd {
         let main = system.mainScreen()
         let tally = Tally<RestoreTarget>()
         let plannedAt = Date()
+        let landing = self.landing, clock = landingClock
+        let names = Dictionary(screens.map { ($0.uuid, $0.name) }, uniquingKeysWith: { a, _ in a })
         let steps: [JobStep] = plan.keys.sorted().map { pid in
             appStep(pid: pid, wanted: plan[pid]!, system: system, worker: jobWorker, timing: timing, tally: tally,
                     gate: { [weak self] in self?.book.lastSetup == key },
@@ -183,7 +202,10 @@ extension Shepherd {
                         if !wasYours { self.draggedNew.insert(String(id)) }   // dragged: its place becomes a spot
                         return true
                     },
-                    action: Self.targetAction(screens: screens, main: main),
+                    // Didn't land: Retry is the same move into its spot (a restore wouldn't place a new window).
+                    action: Self.targetAction(screens: screens, main: main, pid: pid, landing: landing, clock: clock) { placer, t in
+                        .move(placer, "\(names[t.screenUUID] ?? t.screenUUID) (\(Self.unitLabel(t.unit)))")
+                    },
                     onMoved: { [weak self] id, t in
                         guard let self else { return }
                         self.book.restoredIds.insert(t.id)

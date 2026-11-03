@@ -23,7 +23,9 @@ final class FakeWindowSystem: WindowSystem {
                 if let i = sys.windows.firstIndex(where: { $0.id == id }) {
                     let w = sys.windows[i]
                     let fixed = sys.fixedSize.contains(id)   // a fixed-size window moves but keeps its size
-                    let f = fixed ? CGRect(origin: r.origin, size: w.frame.size) : r
+                    var f = fixed ? CGRect(origin: r.origin, size: w.frame.size) : r
+                    if sys.ignorePosition.contains(id) { f.origin = w.frame.origin }          // took the size, not the position
+                    if let cap = sys.shrinkHeight[id] { f.size.height = min(f.height, cap) }   // resizable, but no taller than this
                     sys.windows[i] = CGWindow(id: w.id, pid: w.pid, app: w.app, title: w.title, frame: f)
                 }
             }
@@ -43,6 +45,8 @@ final class FakeWindowSystem: WindowSystem {
     var launched: [pid_t: Date] = [:]
     var nonStandard: Set<UInt32> = []            // subrole isn't standard (dialogs, palettes)
     var fixedSize: Set<UInt32> = []              // size can't change
+    var ignorePosition: Set<UInt32> = []         // setFrame succeeds but the window stays where it was
+    var shrinkHeight: [UInt32: CGFloat] = [:]    // setFrame succeeds but the height is capped
     var listBehaviour: [pid_t: ListBehaviour] = [:]
     var hiddenFromAX: Set<UInt32> = []           // in the CG list but not in the app's AX list (sheets)
     var focused: [pid_t: UInt32] = [:]

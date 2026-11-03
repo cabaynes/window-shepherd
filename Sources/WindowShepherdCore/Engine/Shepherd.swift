@@ -61,6 +61,11 @@ public final class Shepherd {
     /// Window id → the spot it held before its latest record (nil = none) and when, kept briefly
     /// so a move that didn't land can be undone.
     var lastRecorded: [String: (spot: AppSpot?, at: Double)] = [:]
+    /// Window id → when a restore put it in a free app spot (it took the hold then), kept
+    /// briefly so a move that didn't land leaves the spot free.
+    var heldByRestore: [String: Double] = [:]
+    /// What each move asked for, checked a couple of seconds later (`checkLandings`).
+    let landing = Landing()
     /// When the last two settled snapshots ran, oldest first (real time, like `lastMouseUse`).
     var snapshotTimes: [Date] = []
     /// New windows seen once and not placed yet: where, and when (real time, like `lastMouseUse`).
@@ -150,7 +155,8 @@ public final class Shepherd {
         let startSetup = book.lastSetup     // if the screens change mid-move, save nothing
         let screens = system.screens()
         let main = system.mainScreen()
-        let tally = Tally<Bool>()
+        let tally = Tally<UInt32>()
+        let landing = self.landing, clock = landingClock
         if !sel.retry { retryOffer = nil }   // a new move replaces the old offer
 
         func finish(_ problem: JobProblem?) {
@@ -174,7 +180,7 @@ public final class Shepherd {
                 updateBusy()
             }
             if !tally.missed.isEmpty || sel.retry {
-                offerRetry(.move, missed: tally.missed.mapValues { Set($0.keys) }) { [weak self] missed in
+                offerRetry(.move, missed: tally.missed.mapValues { Set($0.keys) }, retry: .move(placer, label)) { [weak self] missed in
                     self?.apply(Selection(byPid: missed, retry: true), placer: placer, label: label)
                 }
             }
@@ -201,7 +207,12 @@ public final class Shepherd {
                           let frame = target.frame() ?? cgFrame,
                           let r = placer.frame(for: frame, screens: screens, main: main),
                           (try? target.setFrame(r)) != nil else { return nil }
-                    return .some(target.windowID)
+                    let id = target.windowID
+                    if let id, id != 0 {
+                        landing.expect(.init(pid: pid, id: id, wanted: r, resizable: target.isResizable, at: clock(),
+                                             retry: .move(placer, label)))
+                    }
+                    return .some(id)
                 }
                 guard let self else { return }
                 if case let .some(id) = moved {
@@ -220,14 +231,16 @@ public final class Shepherd {
         let byPid = sel.byPid ?? windowIdsByPid(sel.pid)
         let patientUntil = Date().addingTimeInterval(timing.movePatience)
         let steps: [JobStep] = byPid.keys.sorted().map { pid in
-            appStep(pid: pid, wanted: Dictionary(uniqueKeysWithValues: byPid[pid]!.map { ($0, true) }),
+            appStep(pid: pid, wanted: Dictionary(uniqueKeysWithValues: byPid[pid]!.map { ($0, $0) }),
                     system: system, worker: jobWorker, timing: timing, tally: tally, patientUntil: patientUntil,
                     gate: { [weak self] in self?.book.lastSetup == startSetup },   // screens changed: this target no longer exists
-                    action: { win, _ in
+                    action: { win, id in
                         guard let f = win.frame(), let r = placer.frame(for: f, screens: screens, main: main) else {
                             throw AXFailure(code: -25200)
                         }
                         try win.setFrame(r)
+                        landing.expect(.init(pid: pid, id: id, wanted: r, resizable: win.isResizable, at: clock(),
+                                             retry: .move(placer, label)))
                     },
                     onMoved: { [weak self] id, _ in self?.book.restoredIds.insert(String(id)) })
         }
@@ -331,9 +344,10 @@ public final class Shepherd {
 
     // MARK: Retry offer
 
-    func offerRetry(_ kind: JobKind, missed: [pid_t: Set<UInt32>], run: @escaping @MainActor ([pid_t: Set<UInt32>]) -> Void) {
+    func offerRetry(_ kind: JobKind, missed: [pid_t: Set<UInt32>], retry: Landing.Retry? = nil,
+                    run: @escaping @MainActor ([pid_t: Set<UInt32>]) -> Void) {
         if !missed.isEmpty {
-            retryOffer = RetryOffer(kind: kind, at: now(), missed: missed, run: run)
+            retryOffer = RetryOffer(kind: kind, at: now(), missed: missed, run: run, retry: retry)
         } else if retryOffer?.kind == kind {
             retryOffer = nil   // a later pass of the same kind got everything
         }

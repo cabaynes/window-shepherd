@@ -97,9 +97,13 @@ extension Shepherd {
             book.resolve(windows: visible, screens: screens, existing: system.allWindowIDs())
         }
         if flashing && book.unresolvedVisible(visible) == 0 { setFlashing(false) }
+        checkLandings(visible: visible, screens: screens, key: key)
         requestKinds(visible)
         placeNewWindows(visible: visible, screens: screens, key: key)
-        let snap = book.snapshot(key: key, windows: visible, screens: screens, now: nowSeconds)
+        // A window whose move isn't checked yet isn't recorded where it is.
+        let unchecked = landing.pending()
+        let snap = book.snapshot(key: key, windows: unchecked.isEmpty ? visible : visible.filter { !unchecked.contains($0.id) },
+                                 screens: screens, now: nowSeconds)
         recordMoves(snap.moved, windows: visible, key: key, screens: screens)
         recordDraggedNew(visible, key: key, screens: screens)
         noteSnapshot()
@@ -243,6 +247,7 @@ extension Shepherd {
         // A patient job does the later passes' work itself: drop them, or they'd run after it, past the budget.
         if patientUntil != nil { cancelRestores() }
         let plannedAt = Date()
+        let landing = self.landing, clock = landingClock
         let steps: [JobStep] = plan.keys.sorted().map { pid in
             appStep(pid: pid, wanted: plan[pid]!, system: system, worker: jobWorker, timing: timing, tally: tally,
                     patientUntil: patientUntil,
@@ -250,7 +255,7 @@ extension Shepherd {
                     skip: { [weak self] id in
                         self?.placedByYou(id, from: plan[pid]?[id]?.from, plannedAt: plannedAt, screens: screens) ?? true
                     },
-                    action: Self.targetAction(screens: screens, main: main),
+                    action: Self.targetAction(screens: screens, main: main, pid: pid, landing: landing, clock: clock) { _, _ in .restore },
                     onMoved: { [weak self] id, t in               // later passes won't touch it again
                         guard let self else { return }
                         self.book.restoredIds.insert(t.id)
@@ -260,6 +265,7 @@ extension Shepherd {
                             self.book.homeless.remove(t.id)
                             if let spot = spotFor[t.id] {
                                 self.spots.holders[key, default: [:]][t.id] = spot
+                                self.heldByRestore[t.id] = self.nowSeconds
                                 self.spots.touch(key: key, visible: [t.id], now: self.nowSeconds)
                                 self.spotsDirty = true
                             }
@@ -301,7 +307,9 @@ extension Shepherd {
                 refused = 0
             }
             if problem != .interrupted {            // missed windows aren't in restoredIds, so restore() retries just them
-                self.offerRetry(.restore, missed: tally.missed.mapValues { Set($0.keys) }) { [weak self] _ in self?.restore() }
+                self.offerRetry(.restore, missed: tally.missed.mapValues { Set($0.keys) }, retry: .restore) { [weak self] _ in
+                    self?.restore()
+                }
             }
             Log.info("restored \(total) windows for \(label)" + (problem.map { " (\($0))" } ?? ""))
             if total > 0 || !tally.skipped.isEmpty || problem != nil || refused > 0 {
@@ -332,8 +340,12 @@ extension Shepherd {
     }
 
     /// Moves a window to its target's fixed screen: the unit (fitted inside), or
-    /// centred at its own size. Runs on the worker.
-    nonisolated static func targetAction(screens: [ScreenInfo], main: ScreenInfo?) -> (WindowHandle, RestoreTarget) throws -> Void {
+    /// centred at its own size, and notes what it asked for (`retry`: how the Retry
+    /// row tries it again if it doesn't land). Runs on the worker.
+    nonisolated static func targetAction(screens: [ScreenInfo], main: ScreenInfo?, pid: pid_t, landing: Landing,
+                                         clock: @escaping () -> Double,
+                                         retry: @escaping (Placer, RestoreTarget) -> Landing.Retry)
+        -> (WindowHandle, RestoreTarget) throws -> Void {
         return { win, t in
             let placer = t.keepSize ? Placer.center(.fixed(uuid: t.screenUUID))
                                     : Placer.unit(t.unit, .fixed(uuid: t.screenUUID), fitInside: true)
@@ -347,6 +359,8 @@ extension Shepherd {
                 throw AXFailure(code: -25200)
             }
             try win.setFrame(r)
+            guard let id = UInt32(t.id) else { return }
+            landing.expect(.init(pid: pid, id: id, wanted: r, resizable: win.isResizable, at: clock(), retry: retry(placer, t)))
         }
     }
 }
