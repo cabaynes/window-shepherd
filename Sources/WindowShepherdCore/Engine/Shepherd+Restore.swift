@@ -84,9 +84,11 @@ extension Shepherd {
                 book.resolve(windows: visible, screens: screens, existing: system.allWindowIDs())
             }
             if flashing && book.unresolvedVisible(visible) == 0 { setFlashing(false) }
+            requestKinds(visible)
             let changed = book.snapshot(key: key, windows: visible, screens: screens, now: nowSeconds)
             if changed || Date().timeIntervalSince1970 - store.lastSaved > 600 {
                 book.forgetClosed(existing: system.allWindowIDs(), running: Set(system.runningApps().keys))
+                forgetKinds()
                 store.save(book.layouts)
             }
         }
@@ -144,6 +146,7 @@ extension Shepherd {
         }
         let running = Set(system.runningApps().keys)
         if book.forgetClosed(existing: system.allWindowIDs(), running: running) { store.save(book.layouts) }
+        forgetKinds()
         let visibleNow = system.visibleWindows()
         var plan = book.restorePlan(key: key, windows: visibleNow, screens: screens, running: running)
         Log.info("restore plan: \(book.planCounts.summary)")

@@ -47,6 +47,13 @@ public final class Shepherd {
     let runner = JobRunner()
     /// Bulk jobs and restores.
     let jobWorker = AXWorker(label: "jobs")
+    /// Learns which windows are main windows; apart from `jobWorker` so restores never wait on it.
+    let kindWorker = AXWorker(label: "kinds")
+    /// Window id → is a main window (not a dialog, settings window or panel). Runtime only.
+    var kinds: [String: Bool] = [:]
+    /// Apps with a kind request in flight, and how often each window came back unreadable.
+    var kindsInFlight = Set<pid_t>()
+    var kindMisses: [String: Int] = [:]
 
     public var onAlert: ((String) -> Void)?
     public var onBusyChanged: ((Bool) -> Void)?
