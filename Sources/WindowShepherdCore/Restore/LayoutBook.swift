@@ -24,6 +24,8 @@ public struct RestoreTarget: Equatable {
     public let from: Spot?
     /// Centre it at its own size on the screen instead of using `unit`.
     public var keepSize = false
+    /// It has no per-window entry for this setup: a free spot for its app was picked.
+    public var fromAppSpot = false
 }
 
 /// What the last restore plan made of each remembered window, for the log.

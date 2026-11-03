@@ -114,13 +114,59 @@ extension Shepherd {
         }
     }
 
-    /// Windows opened while a screen was unplugged go where the undocked setting says.
+    /// Visible main windows with no per-window entry for this setup (and not put back
+    /// or placed by you since the change) go to a free spot for their app. Each app's
+    /// windows are matched to its spots by `AppSpotBook.assign`; the hold is taken only
+    /// once a window is in its spot (`onMoved`), so a move that fails frees it again.
+    /// A window already sitting in the spot it's given just holds it. Returns window id → spot id.
+    func addAppSpots(to plan: inout [pid_t: [UInt32: RestoreTarget]]?, windows: [CGWindow], screens: [ScreenInfo],
+                     key: String) -> [String: String] {
+        guard let byApp = spots.spots[key], !byApp.isEmpty else { return [:] }
+        let layout = book.layouts[key] ?? [:]
+        let connected = Set(screens.map(\.uuid))
+        var byBundle: [String: [CGWindow]] = [:]
+        for w in windows {
+            let id = String(w.id)
+            // An unknown kind waits for a later pass; a window that holds a spot is in it, or being placed.
+            guard layout[id] == nil, !book.restoredIds.contains(id), isMainWindow(id) == true,
+                  !spots.holds(key: key, window: id), plan?[w.pid]?[w.id] == nil,
+                  let bundle = system.bundleID(pid: w.pid), byApp[bundle]?.isEmpty == false else { continue }
+            byBundle[bundle, default: []].append(w)
+        }
+        var spotFor: [String: String] = [:]
+        for (bundle, ws) in byBundle.sorted(by: { $0.key < $1.key }) {
+            let got = spots.assign(key: key, bundle: bundle, windows: ws.map { (String($0.id), Geometry.whereIs($0.frame, in: screens)) },
+                                   now: nowSeconds)
+            for w in ws {
+                let id = String(w.id)
+                guard let spot = got[id] else { continue }   // more windows than free spots: left where they are
+                let at = Geometry.whereIs(w.frame, in: screens)
+                if Geometry.sameSpot(at, spot.spot) {          // already there: nothing to move
+                    book.restoredIds.insert(id)
+                    continue
+                }
+                spots.holders[key]?[id] = nil                  // held once it's in the spot
+                guard connected.contains(spot.scr) else { continue }
+                var t = RestoreTarget(id: id, screenUUID: spot.scr, unit: spot.unit, from: at)
+                t.fromAppSpot = true
+                plan = plan ?? [:]
+                plan![w.pid, default: [:]][w.id] = t
+                spotFor[id] = spot.id
+            }
+        }
+        if !byBundle.isEmpty { spotsDirty = true }   // `assign` refreshed the spots' last-used times
+        return spotFor
+    }
+
+    /// Windows opened while a screen was unplugged go where the undocked setting says,
+    /// unless their app had a spot for them (already in `plan`).
     func addHomeless(to plan: inout [pid_t: [UInt32: RestoreTarget]]?, windows: [CGWindow], screens: [ScreenInfo]) {
         guard undocked.enabled, !book.homeless.isEmpty, let target = undocked.screen(in: screens) else { return }
         let unit = undocked.size.unit
         var n = 0
         defer { if n > 0 { Log.info("\(n) window\(n == 1 ? "" : "s") opened while undocked → \(target.name) (\(undocked.size.rawValue))") } }
-        for w in windows where book.homeless.contains(String(w.id)) && !book.restoredIds.contains(String(w.id)) {
+        for w in windows where book.homeless.contains(String(w.id)) && !book.restoredIds.contains(String(w.id))
+            && plan?[w.pid]?[w.id] == nil {
             var t = RestoreTarget(id: String(w.id), screenUUID: target.uuid, unit: unit ?? UnitRect(x: 0, y: 0, w: 1, h: 1),
                                   from: Geometry.whereIs(w.frame, in: screens))
             t.keepSize = unit == nil
@@ -161,7 +207,10 @@ extension Shepherd {
     func restore(patience: TimeInterval? = nil, recordsSpots: Bool = false) {
         let screens = system.screens()
         let key = Screens.setupKey(screens)
-        guard book.layouts[key] != nil || !book.homeless.isEmpty else { book.settled = true; return }
+        guard book.layouts[key] != nil || !book.homeless.isEmpty || spots.spots[key]?.isEmpty == false else {
+            book.settled = true
+            return
+        }
         if runner.current != nil {   // an earlier pass, or your own move, is still running: check again shortly
             schedulePass(after: restoreTiming.busyRecheck)
             return
@@ -175,6 +224,9 @@ extension Shepherd {
         let visibleNow = system.visibleWindows()
         var plan = book.restorePlan(key: key, windows: visibleNow, screens: screens, running: running)
         Log.info("restore plan: \(book.planCounts.summary)")
+        // Precedence: its own entry, then a free spot for its app, then the undocked default.
+        // Revert replays the frozen copy only.
+        let spotFor = recordsSpots ? [:] : addAppSpots(to: &plan, windows: visibleNow, screens: screens, key: key)
         addHomeless(to: &plan, windows: visibleNow, screens: screens)
         guard let plan, !plan.isEmpty else {
             book.settled = true
@@ -183,6 +235,7 @@ extension Shepherd {
         }
         let main = system.mainScreen()
         let tally = Tally<RestoreTarget>()
+        let apps = Dictionary(visibleNow.map { ($0.id, $0.app) }, uniquingKeysWith: { a, _ in a })
         // Patience runs from the screen change, so a resumed or late pass gets only what's left.
         let remaining = patience ?? (book.changedAt + restoreTiming.patience - nowSeconds)
         let patientUntil = remaining > 0 ? Date().addingTimeInterval(remaining) : nil
@@ -197,13 +250,29 @@ extension Shepherd {
                         self?.placedByYou(id, from: plan[pid]?[id]?.from, plannedAt: plannedAt, screens: screens) ?? true
                     },
                     action: Self.targetAction(screens: screens, main: main),
-                    onMoved: { [weak self] _, t in                // later passes won't touch it again
+                    onMoved: { [weak self] id, t in               // later passes won't touch it again
                         guard let self else { return }
                         self.book.restoredIds.insert(t.id)
-                        // Revert, and the undocked default (your own setting placing it), count as spots.
-                        // (A target placed from an app spot refreshes that spot with `spots.touch` instead;
-                        // a plain restore to its own per-window entry records nothing.)
-                        if self.book.homeless.remove(t.id) != nil || recordsSpots,
+                        let name = screens.first { $0.uuid == t.screenUUID }?.name ?? t.screenUUID
+                        let app = apps[id] ?? "?"
+                        if t.fromAppSpot {   // in its app's spot: it holds it now, and the spot is refreshed, not added
+                            self.book.homeless.remove(t.id)
+                            if let spot = spotFor[t.id] {
+                                self.spots.holders[key, default: [:]][t.id] = spot
+                                self.spots.touch(key: key, visible: [t.id], now: self.nowSeconds)
+                                self.spotsDirty = true
+                            }
+                            Log.info("\(app) window \(id) → its spot on \(name) (\(Self.unitLabel(t.unit))), no memory for this screen setup")
+                            return
+                        }
+                        // Revert, and the undocked default (your own setting placing it), count as spots;
+                        // a plain restore to its own per-window entry records nothing.
+                        let homeless = self.book.homeless.remove(t.id) != nil
+                        if homeless {
+                            let size = t.keepSize ? UndockedWindows.Size.keep.rawValue : Self.unitLabel(t.unit)
+                            Log.info("\(app) window \(id) → \(name) (\(size)), opened while undocked")
+                        }
+                        if homeless || recordsSpots,
                            let w = self.system.visibleWindows().first(where: { String($0.id) == t.id }) {
                             self.recordSpot(w, key: key, screens: screens)
                         }
