@@ -63,6 +63,16 @@ public final class Shepherd {
     var lastRecorded: [String: (spot: AppSpot?, at: Double)] = [:]
     /// When the last two settled snapshots ran, oldest first (real time, like `lastMouseUse`).
     var snapshotTimes: [Date] = []
+    /// New windows seen once and not placed yet: where, and when (real time, like `lastMouseUse`).
+    /// Neither in this setup's per-window layout nor holding a spot. Runtime only.
+    var firstSeen: [String: (at: Spot, tick: Double)] = [:]
+    /// Of those: ticks spent waiting for the kind, and when each was ready while a job ran.
+    var newKindWaits: [String: Int] = [:]
+    var newReadyAt: [String: Double] = [:]
+    /// Windows never placed as new: open before they could be, or left once. Runtime only.
+    var notNew = Set<String>()
+    /// New windows you dragged before they could be placed: their first recording becomes a spot.
+    var draggedNew = Set<String>()
 
     public var onAlert: ((String) -> Void)?
     public var onBusyChanged: ((Bool) -> Void)?
@@ -367,6 +377,7 @@ public final class Shepherd {
         book.prune(running: system.runningApps())
         let key = Screens.setupKey(system.screens())
         book.lastSetup = key
+        noteNewAtStart(key: key)
         book.snapshot(key: key, windows: system.visibleWindows(), screens: system.screens(), now: nowSeconds)
         noteSnapshot()
     }

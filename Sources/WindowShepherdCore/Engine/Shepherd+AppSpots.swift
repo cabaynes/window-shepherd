@@ -66,3 +66,189 @@ extension Shepherd {
         spotStore.save(spots.spots)
     }
 }
+
+/// New windows go to a free spot for their app as soon as they settle (seen twice,
+/// sitting still), at launch, after a restart or any time after; never later.
+extension Shepherd {
+    /// Ticks a new window waits for its kind before it's left where it is.
+    static let newKindWaitLimit = 3
+    /// Seconds a ready new window waits for a running job before it's left where it is.
+    static let newJobWait: Double = 10
+
+    /// Each settled tick, before the snapshot (and while a job runs, so new windows are
+    /// still sighted). A window's first sighting is noted. At its next one, if it sat still,
+    /// the mouse wasn't used and it's a main window, it goes to a free spot for its app.
+    /// Anything else leaves it where it is, for good.
+    func placeNewWindows(visible: [CGWindow], screens: [ScreenInfo], key: String) {
+        let t = Date().timeIntervalSince1970
+        let mouse = system.lastMouseUse()?.timeIntervalSince1970
+        let layout = book.layouts[key] ?? [:]
+        func handled(_ id: String) -> Bool {
+            layout[id] != nil || spots.holds(key: key, window: id) || book.restoredIds.contains(id) || book.homeless.contains(id)
+        }
+        var ready: [CGWindow] = []
+        var shown = Set<String>()
+        for w in visible {
+            let id = String(w.id)
+            shown.insert(id)
+            guard let first = firstSeen[id] else {
+                guard !notNew.contains(id) else { continue }
+                if !handled(id), let at = Geometry.whereIs(w.frame, in: screens) {
+                    firstSeen[id] = (at, t)
+                } else {
+                    notNew.insert(id)
+                }
+                continue
+            }
+            if handled(id) { leaveFirstSeen(id); continue }   // placed or remembered meanwhile
+            let still = Geometry.sameSpot(Geometry.whereIs(w.frame, in: screens), first.at)
+            let mouseUsed = mouse.map { $0 > first.tick } ?? false
+            guard still && !mouseUsed else {
+                if !still && mouseUsed { draggedNew.insert(id) }   // you placed it: yours, and a spot
+                leaveFirstSeen(id)
+                continue
+            }
+            switch isMainWindow(id) {
+            case false?:
+                leaveFirstSeen(id)   // a dialog or settings window
+                continue
+            case nil:
+                let waits = (newKindWaits[id] ?? 0) + 1
+                if waits > Self.newKindWaitLimit { leaveFirstSeen(id) } else { newKindWaits[id] = waits }
+                continue
+            case true?:
+                break
+            }
+            if runner.current != nil {
+                let since = newReadyAt[id] ?? t
+                newReadyAt[id] = since
+                if t - since > Self.newJobWait { leaveFirstSeen(id) }
+                continue
+            }
+            ready.append(w)
+        }
+        for id in firstSeen.keys where !shown.contains(id) { leaveFirstSeen(id) }   // closed, minimized, another Space
+        guard !ready.isEmpty else { return }
+        for w in ready { leaveFirstSeen(String(w.id)) }   // decided now: placed, or left where it is
+        placeNew(ready, screens: screens, key: key)
+    }
+
+    /// Never placed as a new window from now on.
+    func leaveFirstSeen(_ id: String) {
+        firstSeen[id] = nil
+        newKindWaits[id] = nil
+        newReadyAt[id] = nil
+        notNew.insert(id)
+    }
+
+    /// Ready new windows, grouped by app, into its free spots: one `.place` job.
+    /// Windows with no free spot (or no bundle ID) are left where the app put them.
+    func placeNew(_ windows: [CGWindow], screens: [ScreenInfo], key: String) {
+        var byBundle: [String: [CGWindow]] = [:]
+        for w in windows where !spots.holds(key: key, window: String(w.id)) {
+            guard let bundle = system.bundleID(pid: w.pid) else { continue }
+            byBundle[bundle, default: []].append(w)
+        }
+        var plan: [pid_t: [UInt32: RestoreTarget]] = [:]
+        var apps: [UInt32: String] = [:]
+        for (bundle, ws) in byBundle.sorted(by: { $0.key < $1.key }) {
+            let got = spots.assign(key: key, bundle: bundle, windows: ws.map { (String($0.id), Geometry.whereIs($0.frame, in: screens)) },
+                                   now: nowSeconds)
+            for w in ws {
+                guard let spot = got[String(w.id)] else { continue }
+                plan[w.pid, default: [:]][w.id] = RestoreTarget(id: String(w.id), screenUUID: spot.scr, unit: spot.unit,
+                                                                from: Geometry.whereIs(w.frame, in: screens))
+                apps[w.id] = w.app
+            }
+        }
+        guard !plan.isEmpty else { return }
+        spotsDirty = true
+        let main = system.mainScreen()
+        let tally = Tally<RestoreTarget>()
+        let plannedAt = Date()
+        let steps: [JobStep] = plan.keys.sorted().map { pid in
+            appStep(pid: pid, wanted: plan[pid]!, system: system, worker: jobWorker, timing: timing, tally: tally,
+                    gate: { [weak self] in self?.book.lastSetup == key },
+                    skip: { [weak self] id in
+                        guard let self else { return true }
+                        let wasYours = self.book.restoredIds.contains(String(id))
+                        guard self.placedByYou(id, from: plan[pid]?[id]?.from, plannedAt: plannedAt, screens: screens) else { return false }
+                        if !wasYours {   // dragged: not in the spot it was given, and its place becomes one
+                            self.spots.holders[key]?[String(id)] = nil
+                            self.draggedNew.insert(String(id))
+                        }
+                        return true
+                    },
+                    action: Self.targetAction(screens: screens, main: main),
+                    onMoved: { [weak self] id, t in
+                        guard let self else { return }
+                        self.book.restoredIds.insert(t.id)
+                        let name = screens.first { $0.uuid == t.screenUUID }?.name ?? t.screenUUID
+                        let why = self.inGuessingPeriod(pid: pid) ? "opened at launch" : "new window"
+                        Log.info("\(apps[id] ?? "?") window \(id) → its spot on \(name) (\(Self.unitLabel(t.unit))), \(why)")
+                    })
+        }
+        let count = plan.values.reduce(0) { $0 + $1.count }
+        runner.run(.place, steps: steps, deadline: deadlineFor(windowCount: count)) { [weak self] _ in
+            guard let self else { return }
+            tally.settle()
+            // Not placed (the app refused or didn't answer, or a newer move came first): its spot is free again.
+            for (_, targets) in plan {
+                for id in targets.keys.map(String.init) where !tally.ids.contains(id) && !self.book.restoredIds.contains(id) {
+                    self.spots.holders[key]?[id] = nil
+                }
+            }
+            guard self.book.lastSetup == key else { return }
+            self.recordNow(tally.ids)   // the per-window layout; their held spot is refreshed, not added again
+        }
+    }
+
+    /// At launch: windows an app opened shortly before Window Shepherd started (at login,
+    /// after a restart) with no per-window entry are new, and this look is their first
+    /// sighting. Every other window already open isn't.
+    func noteNewAtStart(key: String) {
+        let visible = system.visibleWindows()
+        let screens = system.screens()
+        let layout = book.layouts[key] ?? [:]
+        let t = Date().timeIntervalSince1970
+        for w in visible where layout[String(w.id)] == nil {
+            guard let launched = system.launchDate(pid: w.pid), now().timeIntervalSince(launched) < restoreTiming.guessing,
+                  let at = Geometry.whereIs(w.frame, in: screens) else { continue }
+            firstSeen[String(w.id)] = (at, t)
+        }
+        let open = Set(system.allWindowIDs().map { String($0) }).union(visible.map { String($0.id) })
+        notNew = open.subtracting(firstSeen.keys)
+        requestKinds(visible.filter { firstSeen[String($0.id)] != nil })
+    }
+
+    /// New windows you dragged before they could be placed: once the snapshot has
+    /// recorded them where they now sit, that place is a spot (yours).
+    func recordDraggedNew(_ windows: [CGWindow], key: String, screens: [ScreenInfo]) {
+        guard !draggedNew.isEmpty else { return }
+        for w in windows where draggedNew.contains(String(w.id)) {
+            let id = String(w.id)
+            guard isMainWindow(id) != nil,
+                  Geometry.sameSpot(book.layouts[key]?[id]?.spot, Geometry.whereIs(w.frame, in: screens)) else { continue }
+            draggedNew.remove(id)
+            recordSpot(w, key: key, screens: screens)
+        }
+    }
+
+    /// Forget closed windows.
+    func forgetNewWindows(existing: Set<UInt32>) {
+        guard !existing.isEmpty else { return }   // the window list couldn't be read
+        let ids = Set(existing.map { String($0) })
+        notNew.formIntersection(ids)
+        draggedNew.formIntersection(ids)
+    }
+
+    /// "90% centered", "Full screen", "60% centered" (the undocked sizes), else "x%,y% w×h%".
+    static func unitLabel(_ u: UnitRect) -> String {
+        let named = UndockedWindows.Size.allCases.first { size in
+            size.unit.map { Geometry.sameSpot(Spot(scr: "", unit: $0), Spot(scr: "", unit: u)) } ?? false
+        }
+        if let named { return named.rawValue }
+        func pct(_ v: Double) -> Int { Int((v * 100).rounded()) }
+        return "\(pct(u.x))%,\(pct(u.y))% \(pct(u.w))×\(pct(u.h))%"
+    }
+}

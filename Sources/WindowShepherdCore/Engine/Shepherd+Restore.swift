@@ -47,6 +47,7 @@ extension Shepherd {
             frozenStore.save(FrozenState(copies: book.frozen, lastChangeKey: key, lastChangeAt: nowSeconds))
             store.save(book.layouts)
             retryOffer = nil   // its targets were for the old setup
+            for id in firstSeen.keys { leaveFirstSeen(id) }   // macOS is moving windows now: the restore's job
             setFlashing(false)
             resumeRestore = false   // that restore was for the old setup
             if let job = runner.current {   // it was moving/restoring for the old setup: stop it
@@ -65,6 +66,11 @@ extension Shepherd {
         if !book.settled && nowSeconds - book.changedAt > restoreTiming.unsettledLimit { book.settled = true }
         guard book.settled && runner.current == nil else {
             snapshotTimes = []   // a gap in the snapshots: a move seen after it can't be timed against the mouse
+            if book.settled {    // new windows are still sighted while a job runs; placing them waits for it
+                let visible = system.visibleWindows()
+                requestKinds(visible)
+                placeNewWindows(visible: visible, screens: screens, key: key)
+            }
             return
         }
         let shown = system.visibleWindows()
@@ -90,8 +96,10 @@ extension Shepherd {
         }
         if flashing && book.unresolvedVisible(visible) == 0 { setFlashing(false) }
         requestKinds(visible)
+        placeNewWindows(visible: visible, screens: screens, key: key)
         let snap = book.snapshot(key: key, windows: visible, screens: screens, now: nowSeconds)
         recordMoves(snap.moved, windows: visible, key: key, screens: screens)
+        recordDraggedNew(visible, key: key, screens: screens)
         noteSnapshot()
         spots.touch(key: key, visible: book.visibleAtLastTick, now: nowSeconds)
         if snap.changed || Date().timeIntervalSince1970 - store.lastSaved > 600 {
@@ -99,6 +107,7 @@ extension Shepherd {
             book.forgetClosed(existing: existing, running: Set(system.runningApps().keys))
             forgetKinds()
             forgetSpots(existing: existing)
+            forgetNewWindows(existing: existing)
             store.save(book.layouts)
         }
     }
@@ -160,6 +169,7 @@ extension Shepherd {
         if book.forgetClosed(existing: existing, running: running) { store.save(book.layouts) }
         forgetKinds()
         forgetSpots(existing: existing)
+        forgetNewWindows(existing: existing)
         let visibleNow = system.visibleWindows()
         var plan = book.restorePlan(key: key, windows: visibleNow, screens: screens, running: running)
         Log.info("restore plan: \(book.planCounts.summary)")
@@ -181,40 +191,10 @@ extension Shepherd {
             appStep(pid: pid, wanted: plan[pid]!, system: system, worker: jobWorker, timing: timing, tally: tally,
                     patientUntil: patientUntil,
                     gate: { [weak self] in self?.book.lastSetup == key },
-                    // You placed it while this job ran (a snap): it's yours now.
                     skip: { [weak self] id in
-                        guard let self else { return true }
-                        if self.book.restoredIds.contains(String(id)) { return true }
-                        // Dragged since the plan was made (no snapshot runs during a job): yours now.
-                        // Moved with no mouse use since then: macOS or the app moved it (after a wake or
-                        // an unplug they do, for a while), so it still goes back (live 2026-10-29).
-                        guard let from = plan[pid]?[id]?.from,
-                              let w = self.system.visibleWindows().first(where: { $0.id == id }),
-                              !Geometry.sameSpot(Geometry.whereIs(w.frame, in: screens), from) else { return false }
-                        guard let used = self.system.lastMouseUse(), used > plannedAt else {
-                            Log.info("\(w.app) window \(id) moved since the plan with no mouse use: putting it back")
-                            return false
-                        }
-                        Log.info("\(w.app) window \(id) dragged since the plan: left there")
-                        self.book.restoredIds.insert(String(id))
-                        self.book.protect[String(id)] = nil
-                        self.book.markYours(String(id))
-                        return true
+                        self?.placedByYou(id, from: plan[pid]?[id]?.from, plannedAt: plannedAt, screens: screens) ?? true
                     },
-                    action: { win, t in
-                        let placer = t.keepSize ? Placer.center(.fixed(uuid: t.screenUUID))
-                                                : Placer.unit(t.unit, .fixed(uuid: t.screenUUID), fitInside: true)
-                        // A fixed-screen unit needs no frame from the app; centring keeps the window's size.
-                        var current = CGRect.zero
-                        if t.keepSize {   // no size to keep if the app didn't answer: retry, never shrink it
-                            guard let f = win.frame() else { throw AXFailure(code: -25200) }
-                            current = f
-                        }
-                        guard let r = placer.frame(for: current, screens: screens, main: main) else {
-                            throw AXFailure(code: -25200)
-                        }
-                        try win.setFrame(r)
-                    },
+                    action: Self.targetAction(screens: screens, main: main),
                     onMoved: { [weak self] _, t in                // later passes won't touch it again
                         guard let self else { return }
                         self.book.restoredIds.insert(t.id)
@@ -256,6 +236,45 @@ extension Shepherd {
                 self.alert(reportText("Restored \(total) window\(total == 1 ? "" : "s") for this screen setup",
                                       skipped: tally.skipped, hasMissed: !tally.missed.isEmpty, problem: problem, refused: refused))
             }
+        }
+    }
+
+    /// Just before a restore or placement moves a window: true if you placed it
+    /// since the plan was made, so it's yours now and stays where it is.
+    func placedByYou(_ id: UInt32, from: Spot?, plannedAt: Date, screens: [ScreenInfo]) -> Bool {
+        if book.restoredIds.contains(String(id)) { return true }   // a hotkey or menu move while the job ran
+        // Dragged since the plan was made (no snapshot runs during a job): yours now.
+        // Moved with no mouse use since then: macOS or the app moved it (after a wake or
+        // an unplug they do, for a while), so it still goes (live 2026-10-29).
+        guard let from, let w = system.visibleWindows().first(where: { $0.id == id }),
+              !Geometry.sameSpot(Geometry.whereIs(w.frame, in: screens), from) else { return false }
+        guard let used = system.lastMouseUse(), used > plannedAt else {
+            Log.info("\(w.app) window \(id) moved since the plan with no mouse use: putting it back")
+            return false
+        }
+        Log.info("\(w.app) window \(id) dragged since the plan: left there")
+        book.restoredIds.insert(String(id))
+        book.protect[String(id)] = nil
+        book.markYours(String(id))
+        return true
+    }
+
+    /// Moves a window to its target's fixed screen: the unit (fitted inside), or
+    /// centred at its own size. Runs on the worker.
+    nonisolated static func targetAction(screens: [ScreenInfo], main: ScreenInfo?) -> (WindowHandle, RestoreTarget) throws -> Void {
+        return { win, t in
+            let placer = t.keepSize ? Placer.center(.fixed(uuid: t.screenUUID))
+                                    : Placer.unit(t.unit, .fixed(uuid: t.screenUUID), fitInside: true)
+            // A fixed-screen unit needs no frame from the app; centring keeps the window's size.
+            var current = CGRect.zero
+            if t.keepSize {   // no size to keep if the app didn't answer: retry, never shrink it
+                guard let f = win.frame() else { throw AXFailure(code: -25200) }
+                current = f
+            }
+            guard let r = placer.frame(for: current, screens: screens, main: main) else {
+                throw AXFailure(code: -25200)
+            }
+            try win.setFrame(r)
         }
     }
 }
