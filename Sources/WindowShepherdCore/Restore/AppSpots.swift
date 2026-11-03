@@ -169,9 +169,10 @@ public final class AppSpotStore {
     public let url: URL
     private let queue = DispatchQueue(label: "window-shepherd.app-spots", qos: .utility)
 
-    /// "layouts.json" → "app-spots.json" in the same folder.
+    /// "layouts.json" → "layouts-app-spots.json" in the same folder.
     public static func url(beside layouts: URL) -> URL {
-        layouts.deletingLastPathComponent().appendingPathComponent("app-spots.json")
+        layouts.deletingLastPathComponent()
+            .appendingPathComponent(layouts.deletingPathExtension().lastPathComponent + "-app-spots.json")
     }
 
     public init(url: URL) { self.url = url }

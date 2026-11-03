@@ -145,7 +145,9 @@ extension Shepherd {
     }
 
     /// `patience`: seconds to keep retrying from now; nil = what's left since the screen change.
-    func restore(patience: TimeInterval? = nil) {
+    /// `recordsSpots`: every window it moves becomes an app spot (Revert: your choice of
+    /// arrangement); later passes and the Retry row don't inherit it.
+    func restore(patience: TimeInterval? = nil, recordsSpots: Bool = false) {
         let screens = system.screens()
         let key = Screens.setupKey(screens)
         guard book.layouts[key] != nil || !book.homeless.isEmpty else { book.settled = true; return }
@@ -216,10 +218,10 @@ extension Shepherd {
                     onMoved: { [weak self] _, t in                // later passes won't touch it again
                         guard let self else { return }
                         self.book.restoredIds.insert(t.id)
-                        // The undocked default is your own setting placing it: that counts as a spot.
+                        // Revert, and the undocked default (your own setting placing it), count as spots.
                         // (A target placed from an app spot refreshes that spot with `spots.touch` instead;
-                        // one sent to its own per-window entry records nothing.)
-                        if self.book.homeless.remove(t.id) != nil,
+                        // a plain restore to its own per-window entry records nothing.)
+                        if self.book.homeless.remove(t.id) != nil || recordsSpots,
                            let w = self.system.visibleWindows().first(where: { String($0.id) == t.id }) {
                             self.recordSpot(w, key: key, screens: screens)
                         }

@@ -36,6 +36,11 @@ final class AppSpotStoreTests: XCTestCase {
         XCTAssertEqual(used.first, 5)
     }
 
+    func testFileNamedAfterTheLayoutsFile() {
+        let layouts = URL(fileURLWithPath: "/tmp/x/1234.json")
+        XCTAssertEqual(AppSpotStore.url(beside: layouts).path, "/tmp/x/1234-app-spots.json")
+    }
+
     // MARK: Shepherd start
 
     var sys: FakeWindowSystem!

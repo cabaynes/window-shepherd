@@ -16,8 +16,7 @@ final class AppSpotRecordingTests: XCTestCase {
         sys = FakeWindowSystem()
         sys.allScreens = [lap, dell]
         sys.main = lap
-        let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-        store = LayoutStore(url: dir.appendingPathComponent("layouts.json"))
+        store = LayoutStore(url: FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".json"))
         spotStore = AppSpotStore(url: AppSpotStore.url(beside: store.url))
         clock = Date()
     }
@@ -139,6 +138,32 @@ final class AppSpotRecordingTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(sys.frameOf(1)?.minX ?? 0, 1000, "it was moved")
         s.tick(); s.tick()
         XCTAssertTrue(spots(s, "Safari").isEmpty)
+    }
+
+    func testRevertRecordsSpotsButPlainRestoreDoesNot() async {
+        addApp(10, "Safari", windows: [(1, rect(1100))])
+        let s = make()
+        s.tick()
+        await waitUntil { s.isMainWindow("1") != nil }
+        clock = clock.addingTimeInterval(120)   // in use long enough to freeze when you leave it
+        sys.allScreens = [lap]
+        move(1, to: rect(50))
+        s.screensChanged()
+        await waitUntil { !s.isBusy }
+        sys.allScreens = [lap, dell]
+        s.tick()
+        await waitUntil(4) { !s.isBusy }
+        XCTAssertEqual(sys.frameOf(1)?.minX ?? 0, 1100, accuracy: 0.5, "a plain restore put it back")
+        XCTAssertTrue(spots(s, "Safari").isEmpty, "a restore to its own entry records no spot")
+        XCTAssertNotNil(s.book.frozen[key]?.layout["1"])
+        move(1, to: rect(1500))
+        s.tick(); s.tick()
+        s.revert()
+        await waitUntil(4) { !s.isBusy }
+        XCTAssertEqual(sys.frameOf(1)?.minX ?? 0, 1100, accuracy: 0.5, "reverted")
+        let list = spots(s, "Safari")
+        XCTAssertEqual(list.count, 1)
+        XCTAssertTrue(Geometry.sameSpot(list.first?.spot, place(rect(1100))), "\(list)")
     }
 
     /// As in UndockedTests: Safari remembered on the Dell; unplug; Notes window 7
