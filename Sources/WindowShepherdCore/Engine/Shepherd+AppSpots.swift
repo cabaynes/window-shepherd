@@ -26,6 +26,7 @@ extension Shepherd {
         let id = String(w.id)
         guard isMainWindow(id) == true, let bundle = system.bundleID(pid: w.pid),
               let spot = Geometry.whereIs(w.frame, in: screens) else { return }
+        if placing?.key == key { releasePlacing(id) }   // a spot it was given but never sat in isn't its own
         let held = spots.holders[key]?[id].flatMap { h in spots.spots[key]?[bundle]?.first { $0.id == h } }
         lastRecorded[id] = (held, nowSeconds)
         spots.record(key: key, bundle: bundle, window: id, at: spot, now: nowSeconds)
@@ -76,10 +77,12 @@ extension Shepherd {
     static let newJobWait: Double = 10
 
     /// Each settled tick, before the snapshot (and while a job runs, so new windows are
-    /// still sighted). A window's first sighting is noted. At its next one, if it sat still,
-    /// the mouse wasn't used and it's a main window, it goes to a free spot for its app.
-    /// Anything else leaves it where it is, for good.
+    /// still sighted). A window's first sighting is noted. At its next one, if it sat still
+    /// and it's a main window, it goes to a free spot for its app (a click into it doesn't
+    /// stop that; a move does). Anything else leaves it where it is, for good.
     func placeNewWindows(visible: [CGWindow], screens: [ScreenInfo], key: String) {
+        let previous = previousSighting
+        previousSighting = visible
         let t = Date().timeIntervalSince1970
         let mouse = system.lastMouseUse()?.timeIntervalSince1970
         let layout = book.layouts[key] ?? [:]
@@ -88,12 +91,15 @@ extension Shepherd {
         }
         var ready: [CGWindow] = []
         var shown = Set<String>()
+        let shownIDs = Set(visible.map(\.id))
         for w in visible {
             let id = String(w.id)
             shown.insert(id)
             guard let first = firstSeen[id] else {
                 guard !notNew.contains(id) else { continue }
-                if !handled(id), let at = Geometry.whereIs(w.frame, in: screens) {
+                // A tab switch (Finder, Terminal): another tab of a window that's been open a while.
+                if !handled(id), !LayoutBook.isTabSwitch(w, shownIDs: shownIDs, previous: previous),
+                   let at = Geometry.whereIs(w.frame, in: screens) {
                     firstSeen[id] = (at, t)
                 } else {
                     notNew.insert(id)
@@ -101,10 +107,9 @@ extension Shepherd {
                 continue
             }
             if handled(id) { leaveFirstSeen(id); continue }   // placed or remembered meanwhile
-            let still = Geometry.sameSpot(Geometry.whereIs(w.frame, in: screens), first.at)
-            let mouseUsed = mouse.map { $0 > first.tick } ?? false
-            guard still && !mouseUsed else {
-                if !still && mouseUsed { draggedNew.insert(id) }   // you placed it: yours, and a spot
+            guard Geometry.sameSpot(Geometry.whereIs(w.frame, in: screens), first.at) else {
+                // Moved: with the mouse, you placed it (yours, and a spot); without, the app did.
+                if let mouse, mouse > first.tick { draggedNew.insert(id) }
                 leaveFirstSeen(id)
                 continue
             }
@@ -163,6 +168,7 @@ extension Shepherd {
         }
         guard !plan.isEmpty else { return }
         spotsDirty = true
+        placing = (key, Set(plan.values.flatMap { $0.keys }.map { String($0) }))
         let main = system.mainScreen()
         let tally = Tally<RestoreTarget>()
         let plannedAt = Date()
@@ -173,16 +179,15 @@ extension Shepherd {
                         guard let self else { return true }
                         let wasYours = self.book.restoredIds.contains(String(id))
                         guard self.placedByYou(id, from: plan[pid]?[id]?.from, plannedAt: plannedAt, screens: screens) else { return false }
-                        if !wasYours {   // dragged: not in the spot it was given, and its place becomes one
-                            self.spots.holders[key]?[String(id)] = nil
-                            self.draggedNew.insert(String(id))
-                        }
+                        self.releasePlacing(String(id))      // never in the spot it was given
+                        if !wasYours { self.draggedNew.insert(String(id)) }   // dragged: its place becomes a spot
                         return true
                     },
                     action: Self.targetAction(screens: screens, main: main),
                     onMoved: { [weak self] id, t in
                         guard let self else { return }
                         self.book.restoredIds.insert(t.id)
+                        self.placing?.pending.remove(t.id)   // in its spot: the hold is real now
                         let name = screens.first { $0.uuid == t.screenUUID }?.name ?? t.screenUUID
                         let why = self.inGuessingPeriod(pid: pid) ? "opened at launch" : "new window"
                         Log.info("\(apps[id] ?? "?") window \(id) → its spot on \(name) (\(Self.unitLabel(t.unit))), \(why)")
@@ -192,15 +197,22 @@ extension Shepherd {
         runner.run(.place, steps: steps, deadline: deadlineFor(windowCount: count)) { [weak self] _ in
             guard let self else { return }
             tally.settle()
-            // Not placed (the app refused or didn't answer, or a newer move came first): its spot is free again.
-            for (_, targets) in plan {
-                for id in targets.keys.map(String.init) where !tally.ids.contains(id) && !self.book.restoredIds.contains(id) {
-                    self.spots.holders[key]?[id] = nil
-                }
-            }
+            self.releasePlacing()   // not placed (refused, no answer, a newer move came first): free again
             guard self.book.lastSetup == key else { return }
             self.recordNow(tally.ids)   // the per-window layout; their held spot is refreshed, not added again
         }
+    }
+
+    /// Holds the running placement gave to windows it hasn't moved yet (`id`, or all of
+    /// them) are dropped, so those spots are free again. Also when the job is stopped
+    /// by a screen change or cleared as stale, which skips its `done`.
+    func releasePlacing(_ id: String? = nil) {
+        guard let p = placing else { return }
+        for one in id.map({ [$0] }) ?? Array(p.pending) where p.pending.contains(one) {
+            spots.holders[p.key]?[one] = nil
+            placing?.pending.remove(one)
+        }
+        if id == nil { placing = nil }
     }
 
     /// At launch: windows an app opened shortly before Window Shepherd started (at login,
@@ -218,6 +230,7 @@ extension Shepherd {
         }
         let open = Set(system.allWindowIDs().map { String($0) }).union(visible.map { String($0.id) })
         notNew = open.subtracting(firstSeen.keys)
+        previousSighting = visible
         requestKinds(visible.filter { firstSeen[String($0.id)] != nil })
     }
 

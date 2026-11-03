@@ -73,6 +73,10 @@ public final class Shepherd {
     var notNew = Set<String>()
     /// New windows you dragged before they could be placed: their first recording becomes a spot.
     var draggedNew = Set<String>()
+    /// The window list at the last new-window sighting (to tell a tab switch from a new window).
+    var previousSighting: [CGWindow] = []
+    /// The running placement's setup and the windows it gave a spot but hasn't moved yet.
+    var placing: (key: String, pending: Set<String>)?
 
     public var onAlert: ((String) -> Void)?
     public var onBusyChanged: ((Bool) -> Void)?

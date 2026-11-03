@@ -11,6 +11,7 @@ extension Shepherd {
         // Safety net: a job that outlived its own deadline is stale; clear it
         // so it can't pause snapshots (and so auto-restore) forever.
         runner.clearIfStale(now: now())
+        if runner.current?.kind != .place { releasePlacing() }   // cleared as stale: its `done` never runs
         checkScreens()
         spotsTick()
         updateBusy()
@@ -35,6 +36,7 @@ extension Shepherd {
         let screens = system.screens()
         let key = Screens.setupKey(screens)
         if key != book.lastSetup {
+            releasePlacing()   // a placement for the old setup is about to be stopped without its `done`
             let first = restoreTiming.passes.first ?? 0
             Log.info("screen setup is now \(Screens.setupLabel(screens)); \(book.layouts[key]?.count ?? 0) windows remembered for it, restoring in \(Int(first.rounded()))s")
             let before = Set(book.lastSetup?.split(separator: "+").map(String.init) ?? [])

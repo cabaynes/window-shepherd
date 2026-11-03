@@ -128,6 +128,56 @@ final class NewWindowPlacementTests: XCTestCase {
         XCTAssertTrue(list.contains { Geometry.sameSpot($0.spot, Spot(scr: dell.uuid, unit: ninety)) }, "the free spot stays")
     }
 
+    func testClickWithoutMovingStillPlaces() async {
+        let s = make()
+        seedFreeSpot(s, ninety, on: dell)
+        addApp(10, "Safari", windows: [(5, rect(100))], ago: 1)
+        s.tick()
+        await waitUntil { s.isMainWindow("5") != nil }
+        sys.locked { sys.mouseUsed = Date() }   // you click into it (its address bar) without moving it
+        s.tick()
+        await waitUntil { !s.isBusy }
+        XCTAssertEqual(sys.frameOf(5), dell90)
+    }
+
+    func testTabSwitchIsNotANewWindow() async {
+        addApp(20, "Finder", windows: [(1, rect(100))])
+        let s = make()
+        seedFreeSpot(s, ninety, on: dell, app: "Finder")
+        s.tick()
+        await waitUntil { s.isMainWindow("1") != nil }
+        // ⌘T (or a click on a background tab): a new window id at the same frame; the old tab leaves the screen.
+        sys.locked {
+            sys.windows.removeAll { $0.id == 1 }
+            sys.offSpace = [1]
+            sys.windows.append(CGWindow(id: 2, pid: 20, app: "Finder", title: "Doc", frame: rect(100)))
+        }
+        await settle(s, 2)
+        s.tick()
+        await waitUntil { !s.isBusy }
+        XCTAssertEqual(sys.frameOf(2), rect(100))
+        XCTAssertEqual(sys.setCount(2), 0)
+        XCTAssertFalse(s.spots.holds(key: key, window: "2"))
+    }
+
+    func testScreenChangeMidPlacementFreesItsSpot() async {
+        sys.setDelay[5] = 0.5   // a slow app keeps the placement running
+        let s = make()
+        seedFreeSpot(s, ninety, on: dell)
+        addApp(10, "Safari", windows: [(5, rect(100))], ago: 1)
+        s.tick()
+        await waitUntil { s.isMainWindow("5") != nil }
+        s.tick()
+        XCTAssertTrue(s.isBusy, "placing")
+        let docked = key
+        XCTAssertTrue(s.spots.holds(key: docked, window: "5"))
+        try? await Task.sleep(nanoseconds: 100_000_000)
+        sys.allScreens = [lap]
+        s.screensChanged()
+        XCTAssertFalse(s.spots.holds(key: docked, window: "5"), "never placed there: the spot is free again")
+        await waitUntil { !s.isBusy }
+    }
+
     func testNoFreeSpotLeavesIt() async {
         addApp(10, "Safari", windows: [(1, dell90)])
         let s = make()

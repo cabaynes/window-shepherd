@@ -257,15 +257,20 @@ public final class LayoutBook {
     public func dropTabSwitches(shown: [CGWindow], previous: [CGWindow]) {
         let nowIds = Set(shown.map(\.id))
         for w in shown where offscreen.contains(String(w.id)) {
-            let replaced = previous.contains { p in
-                p.pid == w.pid && p.id != w.id && !nowIds.contains(p.id)
-                    && abs(p.frame.minX - w.frame.minX) <= 1 && abs(p.frame.minY - w.frame.minY) <= 1
-                    && abs(p.frame.width - w.frame.width) <= 1 && abs(p.frame.height - w.frame.height) <= 1
-            }
-            if replaced {
+            if Self.isTabSwitch(w, shownIDs: nowIds, previous: previous) {
                 offscreen.remove(String(w.id))
                 restoredIds.insert(String(w.id))
             }
+        }
+    }
+
+    /// `w` appeared exactly where another window of its app was in `previous`,
+    /// which has just left the screen (`shownIDs` = on screen now): a tab switch.
+    public static func isTabSwitch(_ w: CGWindow, shownIDs: Set<UInt32>, previous: [CGWindow]) -> Bool {
+        previous.contains { p in
+            p.pid == w.pid && p.id != w.id && !shownIDs.contains(p.id)
+                && abs(p.frame.minX - w.frame.minX) <= 1 && abs(p.frame.minY - w.frame.minY) <= 1
+                && abs(p.frame.width - w.frame.width) <= 1 && abs(p.frame.height - w.frame.height) <= 1
         }
     }
 
