@@ -62,4 +62,30 @@ final class WindowKindTests: XCTestCase {
         s.forgetKinds()
         XCTAssertEqual(s.kinds, ["1": true])
     }
+
+    func testListFailureIsNotAMiss() async {
+        sys.addApp(10, "Safari", windows: [(1, r)])
+        sys.listBehaviour[10] = .throwAlways
+        let s = make()
+        for _ in 0..<5 {
+            s.tick()
+            await waitUntil { s.kindsInFlight.isEmpty }
+        }
+        XCTAssertGreaterThanOrEqual(sys.locked { sys.listCalls[10] } ?? 0, 3, "asked again on later ticks")
+        XCTAssertNil(s.kinds["1"], "a failed list says nothing about the window")
+    }
+
+    func testUnreadableKindPromotedAfterThreeMisses() async {
+        sys.addApp(10, "Safari", windows: [(1, r)])
+        sys.hiddenFromAX = [1]
+        let s = make()
+        for _ in 0..<2 {
+            s.tick()
+            await waitUntil { s.kindsInFlight.isEmpty }
+        }
+        XCTAssertNil(s.kinds["1"])
+        s.tick()
+        await waitUntil { s.kinds["1"] != nil }
+        XCTAssertEqual(s.kinds["1"], true)
+    }
 }
