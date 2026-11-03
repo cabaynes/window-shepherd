@@ -34,6 +34,9 @@ public final class Shepherd {
     public let system: WindowSystem
     public let store: LayoutStore
     public let frozenStore: FrozenStore
+    public let spotStore: AppSpotStore
+    /// Per setup and app, where its windows have been (see AppSpotBook).
+    public let spots: AppSpotBook
     /// The last screen change (persisted): the Revert row is for that combination.
     public internal(set) var lastChange: (key: String, at: Double)?
     public let book: LayoutBook
@@ -71,11 +74,13 @@ public final class Shepherd {
     /// True while Accessibility is missing: the tick does nothing.
     public var paused = false
 
-    public init(system: WindowSystem, store: LayoutStore, frozenStore: FrozenStore? = nil, timing: MoveTiming = .standard,
+    public init(system: WindowSystem, store: LayoutStore, frozenStore: FrozenStore? = nil, spotStore: AppSpotStore? = nil, timing: MoveTiming = .standard,
                 restoreTiming: RestoreTiming = .standard, now: @escaping () -> Date = Date.init) {
         self.system = system
         self.store = store
         self.frozenStore = frozenStore ?? FrozenStore(url: FrozenStore.url(beside: store.url))
+        self.spotStore = spotStore ?? AppSpotStore(url: AppSpotStore.url(beside: store.url))
+        self.spots = AppSpotBook(spots: [:])
         self.timing = timing
         self.restoreTiming = restoreTiming
         self.now = now
@@ -327,6 +332,18 @@ public final class Shepherd {
         let saved = frozenStore.load()
         book.frozen = saved.copies
         if let k = saved.lastChangeKey, let at = saved.lastChangeAt { lastChange = (k, at) }
+        if let loaded = spotStore.load() {
+            spots.spots = loaded
+        } else {
+            let seeded = AppSpotBook.seed(layouts: book.layouts, frozen: book.frozen, bundleFor: { [system] e in
+                system.runningApps()[pid_t(e.pid)] == e.app ? system.bundleID(pid: pid_t(e.pid)) : system.bundleID(appName: e.app)
+            }, now: nowSeconds)
+            spots.spots = seeded
+            spotStore.save(seeded)
+            let n = seeded.values.flatMap { $0.values }.map(\.count).reduce(0, +)
+            let apps = Set(seeded.values.flatMap { $0.keys }).count
+            Log.info("app spots: seeded \(n) spots for \(apps) apps from the remembered layouts")
+        }
         book.prune(running: system.runningApps())
         let key = Screens.setupKey(system.screens())
         book.lastSetup = key

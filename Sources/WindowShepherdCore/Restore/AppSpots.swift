@@ -131,3 +131,75 @@ public final class AppSpotBook {
         holders[key]?[window] != nil
     }
 }
+
+extension AppSpotBook {
+    /// The first app spots, made once from what auto-restore already remembers.
+    /// Each live entry becomes one free spot; a frozen entry adds one only where
+    /// no live entry has the same window id. `used` is the entry's `seen`.
+    /// Entries whose app has no bundle ID are dropped. Per app and setup the
+    /// most recent `maxPerApp` stay.
+    public static func seed(layouts: [String: [String: LayoutEntry]], frozen: [String: FrozenCopy],
+                            bundleFor: (LayoutEntry) -> String?, now: Double) -> AppSpotMap {
+        var entries: [String: [String: LayoutEntry]] = layouts
+        for (key, copy) in frozen {
+            for (window, e) in copy.layout where entries[key]?[window] == nil {
+                entries[key, default: [:]][window] = e
+            }
+        }
+        var map: AppSpotMap = [:]
+        for (key, windows) in entries {
+            var byBundle: [String: [AppSpot]] = [:]
+            // Sorted by window id so the result doesn't depend on dictionary order.
+            for (_, e) in windows.sorted(by: { $0.key < $1.key }) {
+                guard let bundle = bundleFor(e) else { continue }
+                byBundle[bundle, default: []].append(AppSpot(id: UUID().uuidString, scr: e.scr, unit: e.unit, used: e.seen))
+            }
+            for (bundle, list) in byBundle {
+                let kept = list.sorted { $0.used > $1.used }.prefix(maxPerApp)
+                map[key, default: [:]][bundle] = Array(kept)
+            }
+        }
+        return map
+    }
+}
+
+/// App spots on disk (JSON) beside layouts.json, written atomically on a
+/// utility queue, like `LayoutStore`.
+public final class AppSpotStore {
+    public let url: URL
+    private let queue = DispatchQueue(label: "window-shepherd.app-spots", qos: .utility)
+
+    /// "layouts.json" → "app-spots.json" in the same folder.
+    public static func url(beside layouts: URL) -> URL {
+        layouts.deletingLastPathComponent().appendingPathComponent("app-spots.json")
+    }
+
+    public init(url: URL) { self.url = url }
+
+    /// nil when there is no file or it is damaged (the damaged case is logged);
+    /// the caller then seeds from the remembered layouts.
+    public func load() -> AppSpotMap? {
+        guard let data = try? Data(contentsOf: url) else { return nil }
+        do {
+            return try JSONDecoder().decode(AppSpotMap.self, from: data)
+        } catch {
+            Log.info("app spots were damaged; starting from the remembered layouts (\(error.localizedDescription))")
+            return nil
+        }
+    }
+
+    public func save(_ spots: AppSpotMap) {
+        let url = self.url
+        queue.async {
+            do {
+                try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+                try JSONEncoder().encode(spots).write(to: url, options: .atomic)
+            } catch {
+                Log.info("couldn't save app spots: \(error.localizedDescription)")
+            }
+        }
+    }
+
+    /// Waits for pending writes (tests).
+    public func flush() { queue.sync {} }
+}
