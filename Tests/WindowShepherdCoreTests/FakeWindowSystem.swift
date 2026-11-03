@@ -12,6 +12,8 @@ final class FakeWindowSystem: WindowSystem {
         init(_ id: UInt32, _ sys: FakeWindowSystem) { self.id = id; self.sys = sys }
         var windowID: UInt32? { sys.locked { sys.unreadableIDs.contains(id) } ? nil : id }
         func frame() -> CGRect? { sys.locked { sys.noFrame.contains(id) ? nil : sys.windowsByID[id]?.frame } }
+        var isStandard: Bool? { sys.locked { !sys.nonStandard.contains(id) } }
+        var isResizable: Bool { sys.locked { !sys.fixedSize.contains(id) } }
         func setFrame(_ r: CGRect) throws {
             let delay = sys.locked { sys.setDelay[id] ?? 0 }
             if delay > 0 { Thread.sleep(forTimeInterval: delay) }
@@ -20,7 +22,9 @@ final class FakeWindowSystem: WindowSystem {
                 sys.framesSet.append((id, r))
                 if let i = sys.windows.firstIndex(where: { $0.id == id }) {
                     let w = sys.windows[i]
-                    sys.windows[i] = CGWindow(id: w.id, pid: w.pid, app: w.app, title: w.title, frame: r)
+                    let fixed = sys.fixedSize.contains(id)   // a fixed-size window moves but keeps its size
+                    let f = fixed ? CGRect(origin: r.origin, size: w.frame.size) : r
+                    sys.windows[i] = CGWindow(id: w.id, pid: w.pid, app: w.app, title: w.title, frame: f)
                 }
             }
         }
@@ -35,6 +39,10 @@ final class FakeWindowSystem: WindowSystem {
     var front: pid_t?
     var apps: [pid_t: String] = [:]
     var bundles: Set<String> = []
+    var bundleOf: [pid_t: String] = [:]
+    var launched: [pid_t: Date] = [:]
+    var nonStandard: Set<UInt32> = []            // subrole isn't standard (dialogs, palettes)
+    var fixedSize: Set<UInt32> = []              // size can't change
     var listBehaviour: [pid_t: ListBehaviour] = [:]
     var hiddenFromAX: Set<UInt32> = []           // in the CG list but not in the app's AX list (sheets)
     var focused: [pid_t: UInt32] = [:]
@@ -50,9 +58,10 @@ final class FakeWindowSystem: WindowSystem {
 
     var windowsByID: [UInt32: CGWindow] { Dictionary(uniqueKeysWithValues: windows.map { ($0.id, $0) }) }
 
-    func addApp(_ pid: pid_t, _ name: String, windows ws: [(UInt32, CGRect)], title: String? = "Doc") {
+    func addApp(_ pid: pid_t, _ name: String, windows ws: [(UInt32, CGRect)], title: String? = "Doc", bundle: String? = nil) {
         locked {
             apps[pid] = name
+            bundleOf[pid] = bundle ?? "test." + name
             for (id, f) in ws { windows.append(CGWindow(id: id, pid: pid, app: name, title: title, frame: f)) }
         }
     }
@@ -69,6 +78,11 @@ final class FakeWindowSystem: WindowSystem {
     func runningApps() -> [pid_t: String] { locked { apps } }
     func isRunning(bundleID: String) -> Bool { locked { bundles.contains(bundleID) } }
     func appName(pid: pid_t) -> String? { locked { apps[pid] } }
+    func bundleID(pid: pid_t) -> String? { locked { bundleOf[pid] } }
+    func bundleID(appName: String) -> String? {
+        locked { apps.first { $0.value == appName }.flatMap { bundleOf[$0.key] } }
+    }
+    func launchDate(pid: pid_t) -> Date? { locked { launched[pid] } }
     func lastMouseUse() -> Date? { locked { mouseUsed } }
 
     func appWindows(pid: pid_t) throws -> [WindowHandle] {

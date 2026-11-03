@@ -57,13 +57,22 @@ final class AXWindow: WindowHandle {
                        setSize: { set(kAXSizeAttribute, $0) },
                        setPosition: { err = set(kAXPositionAttribute, $0); return err == .success },
                        read: frame,
-                       canResize: {
-                           var settable = DarwinBoolean(false)
-                           return AXUIElementIsAttributeSettable(element, kAXSizeAttribute as CFString, &settable) == .success
-                               && settable.boolValue
-                       },
+                       canResize: { isResizable },
                        pause: { Thread.sleep(forTimeInterval: $0) })
         if !moved { throw AXFailure(code: err.rawValue) }
+    }
+
+    var isStandard: Bool? {
+        var ref: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(element, kAXSubroleAttribute as CFString, &ref) == .success,
+              let s = ref as? String else { return nil }
+        return s == kAXStandardWindowSubrole
+    }
+
+    var isResizable: Bool {
+        var settable = DarwinBoolean(false)
+        return AXUIElementIsAttributeSettable(element, kAXSizeAttribute as CFString, &settable) == .success
+            && settable.boolValue
     }
 
     private func value<T>(_ attr: String, _ type: AXValueType) -> T? {
@@ -126,6 +135,17 @@ public final class LiveWindowSystem: WindowSystem {
     }
 
     public func appName(pid: pid_t) -> String? { NSRunningApplication(processIdentifier: pid)?.localizedName }
+
+    public func bundleID(pid: pid_t) -> String? { NSRunningApplication(processIdentifier: pid)?.bundleIdentifier }
+
+    public func bundleID(appName: String) -> String? {
+        if let a = NSWorkspace.shared.runningApplications.first(where: { $0.localizedName == appName }),
+           let id = a.bundleIdentifier { return id }
+        guard let path = NSWorkspace.shared.fullPath(forApplication: appName) else { return nil }
+        return Bundle(path: path)?.bundleIdentifier
+    }
+
+    public func launchDate(pid: pid_t) -> Date? { NSRunningApplication(processIdentifier: pid)?.launchDate }
 
     static func appElement(_ pid: pid_t) -> AXUIElement {
         let e = AXUIElementCreateApplication(pid)
