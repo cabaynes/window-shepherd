@@ -63,6 +63,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                                                object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.shepherd.screensChanged() }
         }
+        // After a wake, macOS rearranges windows by itself for a while: don't learn those as app spots.
+        NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didWakeNotification,
+                                                          object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.shepherd.didWake() }
+        }
         let dnc = DistributedNotificationCenter.default()
         dnc.addObserver(forName: NSNotification.Name(kTISNotifySelectedKeyboardInputSourceChanged as String),
                         object: nil, queue: .main) { [weak self] _ in

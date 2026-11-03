@@ -129,11 +129,23 @@ final class LayoutBookTests: XCTestCase {
 
     func testRecordsOnlyAfterTwoSightings() {
         let b = book()
-        XCTAssertFalse(b.snapshot(key: key, windows: [win(1, x: 1100)], screens: [lap, dell], now: 1))
+        XCTAssertFalse(b.snapshot(key: key, windows: [win(1, x: 1100)], screens: [lap, dell], now: 1).changed)
         XCTAssertNil(b.layouts[key]?["1"])
-        XCTAssertTrue(b.snapshot(key: key, windows: [win(1, x: 1100)], screens: [lap, dell], now: 3))
+        XCTAssertTrue(b.snapshot(key: key, windows: [win(1, x: 1100)], screens: [lap, dell], now: 3).changed)
         XCTAssertEqual(b.layouts[key]?["1"]?.scr, "UUID-2")
-        XCTAssertFalse(b.snapshot(key: key, windows: [win(1, x: 1100)], screens: [lap, dell], now: 5), "unchanged")
+        XCTAssertFalse(b.snapshot(key: key, windows: [win(1, x: 1100)], screens: [lap, dell], now: 5).changed, "unchanged")
+    }
+
+    func testSnapshotReportsMovedNotFirstRecordings() {
+        let b = book()
+        b.snapshot(key: key, windows: [win(1, x: 1100)], screens: [lap, dell], now: 1)
+        let first = b.snapshot(key: key, windows: [win(1, x: 1100)], screens: [lap, dell], now: 3)
+        XCTAssertTrue(first.changed)
+        XCTAssertEqual(first.moved, [], "a first recording isn't a move")
+        XCTAssertEqual(b.snapshot(key: key, windows: [win(1, x: 1500)], screens: [lap, dell], now: 5).moved, [], "seen once")
+        let second = b.snapshot(key: key, windows: [win(1, x: 1500)], screens: [lap, dell], now: 7)
+        XCTAssertEqual(second.moved, ["1"])
+        XCTAssertEqual(b.snapshot(key: key, windows: [win(1, x: 1500)], screens: [lap, dell], now: 9).moved, [], "unchanged")
     }
 
     func testMidUnplugSightingDoesNotOverwrite() {
@@ -153,7 +165,7 @@ final class LayoutBookTests: XCTestCase {
         // window 1 is minimized / on another Space: absent from the list from now on
         b.snapshot(key: key, windows: [], screens: [lap, dell], now: 29 * day)
         XCTAssertNotNil(b.layouts[key]?["1"], "kept at 29 days")
-        XCTAssertTrue(b.snapshot(key: key, windows: [], screens: [lap, dell], now: 31 * day))
+        XCTAssertTrue(b.snapshot(key: key, windows: [], screens: [lap, dell], now: 31 * day).changed)
         XCTAssertNil(b.layouts[key]?["1"], "forgotten at 31 days")
     }
 

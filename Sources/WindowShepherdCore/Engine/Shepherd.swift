@@ -34,6 +34,9 @@ public final class Shepherd {
     public let system: WindowSystem
     public let store: LayoutStore
     public let frozenStore: FrozenStore
+    public let spotStore: AppSpotStore
+    /// Per setup and app, where its windows have been (see AppSpotBook).
+    public let spots: AppSpotBook
     /// The last screen change (persisted): the Revert row is for that combination.
     public internal(set) var lastChange: (key: String, at: Double)?
     public let book: LayoutBook
@@ -44,6 +47,45 @@ public final class Shepherd {
     let runner = JobRunner()
     /// Bulk jobs and restores.
     let jobWorker = AXWorker(label: "jobs")
+    /// Learns which windows are main windows; apart from `jobWorker` so restores never wait on it.
+    let kindWorker = AXWorker(label: "kinds")
+    /// Window id → is a main window (not a dialog, settings window or panel). Runtime only.
+    var kinds: [String: Bool] = [:]
+    /// Apps with a kind request in flight, and how often each window came back unreadable.
+    var kindsInFlight = Set<pid_t>()
+    var kindMisses: [String: Int] = [:]
+    /// How often each window was missing from its app's own (fully read) window list.
+    var kindAbsences: [String: Int] = [:]
+    /// When the Mac last woke (a guessing period follows).
+    var wokeAt: Double?
+    /// App spots changed since the last save (saved at most once per tick).
+    var spotsDirty = false
+    /// Window id → the spot it held before its latest record (nil = none) and when, kept briefly
+    /// so a move that didn't land can be undone.
+    var lastRecorded: [String: (spot: AppSpot?, at: Double)] = [:]
+    /// Window id → when a restore put it in a free app spot (it took the hold then), kept
+    /// briefly so a move that didn't land leaves the spot free.
+    var heldByRestore: [String: Double] = [:]
+    /// What each move asked for, checked a couple of seconds later (`checkLandings`).
+    let landing = Landing()
+    /// When the last two settled snapshots ran, oldest first (real time, like `lastMouseUse`).
+    var snapshotTimes: [Date] = []
+    /// New windows seen once and not placed yet: where, and when (real time, like `lastMouseUse`).
+    /// Neither in this setup's per-window layout nor holding a spot. Runtime only.
+    var firstSeen: [String: (at: Spot, tick: Double)] = [:]
+    /// Of those: ticks spent waiting for the kind, and when each was ready while a job ran.
+    var newKindWaits: [String: Int] = [:]
+    var newReadyAt: [String: Double] = [:]
+    /// Of those: how often the app moved it before it settled.
+    var newResets: [String: Int] = [:]
+    /// Windows never placed as new: open before they could be, or left once. Runtime only.
+    var notNew = Set<String>()
+    /// New windows you dragged before they could be placed: their first recording becomes a spot.
+    var draggedNew = Set<String>()
+    /// The window list at the last new-window sighting (to tell a tab switch from a new window).
+    var previousSighting: [CGWindow] = []
+    /// The running placement's setup and the windows it gave a spot but hasn't moved yet.
+    var placing: (key: String, pending: Set<String>)?
 
     public var onAlert: ((String) -> Void)?
     public var onBusyChanged: ((Bool) -> Void)?
@@ -71,11 +113,13 @@ public final class Shepherd {
     /// True while Accessibility is missing: the tick does nothing.
     public var paused = false
 
-    public init(system: WindowSystem, store: LayoutStore, frozenStore: FrozenStore? = nil, timing: MoveTiming = .standard,
+    public init(system: WindowSystem, store: LayoutStore, frozenStore: FrozenStore? = nil, spotStore: AppSpotStore? = nil, timing: MoveTiming = .standard,
                 restoreTiming: RestoreTiming = .standard, now: @escaping () -> Date = Date.init) {
         self.system = system
         self.store = store
         self.frozenStore = frozenStore ?? FrozenStore(url: FrozenStore.url(beside: store.url))
+        self.spotStore = spotStore ?? AppSpotStore(url: AppSpotStore.url(beside: store.url))
+        self.spots = AppSpotBook(spots: [:])
         self.timing = timing
         self.restoreTiming = restoreTiming
         self.now = now
@@ -115,7 +159,8 @@ public final class Shepherd {
         let startSetup = book.lastSetup     // if the screens change mid-move, save nothing
         let screens = system.screens()
         let main = system.mainScreen()
-        let tally = Tally<Bool>()
+        let tally = Tally<UInt32>()
+        let landing = self.landing, clock = landingClock
         if !sel.retry { retryOffer = nil }   // a new move replaces the old offer
 
         func finish(_ problem: JobProblem?) {
@@ -139,7 +184,7 @@ public final class Shepherd {
                 updateBusy()
             }
             if !tally.missed.isEmpty || sel.retry {
-                offerRetry(.move, missed: tally.missed.mapValues { Set($0.keys) }) { [weak self] missed in
+                offerRetry(.move, missed: tally.missed.mapValues { Set($0.keys) }, retry: .move(placer, label)) { [weak self] missed in
                     self?.apply(Selection(byPid: missed, retry: true), placer: placer, label: label)
                 }
             }
@@ -166,7 +211,12 @@ public final class Shepherd {
                           let frame = target.frame() ?? cgFrame,
                           let r = placer.frame(for: frame, screens: screens, main: main),
                           (try? target.setFrame(r)) != nil else { return nil }
-                    return .some(target.windowID)
+                    let id = target.windowID
+                    if let id, id != 0 {
+                        landing.expect(.init(pid: pid, id: id, wanted: r, resizable: target.isResizable, at: clock(),
+                                             retry: .move(placer, label)))
+                    }
+                    return .some(id)
                 }
                 guard let self else { return }
                 if case let .some(id) = moved {
@@ -185,14 +235,16 @@ public final class Shepherd {
         let byPid = sel.byPid ?? windowIdsByPid(sel.pid)
         let patientUntil = Date().addingTimeInterval(timing.movePatience)
         let steps: [JobStep] = byPid.keys.sorted().map { pid in
-            appStep(pid: pid, wanted: Dictionary(uniqueKeysWithValues: byPid[pid]!.map { ($0, true) }),
+            appStep(pid: pid, wanted: Dictionary(uniqueKeysWithValues: byPid[pid]!.map { ($0, $0) }),
                     system: system, worker: jobWorker, timing: timing, tally: tally, patientUntil: patientUntil,
                     gate: { [weak self] in self?.book.lastSetup == startSetup },   // screens changed: this target no longer exists
-                    action: { win, _ in
+                    action: { win, id in
                         guard let f = win.frame(), let r = placer.frame(for: f, screens: screens, main: main) else {
                             throw AXFailure(code: -25200)
                         }
                         try win.setFrame(r)
+                        landing.expect(.init(pid: pid, id: id, wanted: r, resizable: win.isResizable, at: clock(),
+                                             retry: .move(placer, label)))
                     },
                     onMoved: { [weak self] id, _ in self?.book.restoredIds.insert(String(id)) })
         }
@@ -218,8 +270,12 @@ public final class Shepherd {
     func recordNow(_ ids: Set<String>) {
         guard !ids.isEmpty else { return }
         let screens = system.screens()
-        book.recordNow(ids: ids, key: Screens.setupKey(screens), windows: system.visibleWindows(), screens: screens, now: nowSeconds)
+        let key = Screens.setupKey(screens)
+        let windows = system.visibleWindows()
+        book.recordNow(ids: ids, key: key, windows: windows, screens: screens, now: nowSeconds)
         store.save(book.layouts)
+        guard key == book.lastSetup else { return }
+        for w in windows where ids.contains(String(w.id)) { recordSpot(w, key: key, screens: screens) }
     }
 
     /// The front app (whole app) or its front window; nil if no app is in front.
@@ -292,11 +348,19 @@ public final class Shepherd {
 
     // MARK: Retry offer
 
-    func offerRetry(_ kind: JobKind, missed: [pid_t: Set<UInt32>], run: @escaping @MainActor ([pid_t: Set<UInt32>]) -> Void) {
+    func offerRetry(_ kind: JobKind, missed: [pid_t: Set<UInt32>], retry: Landing.Retry? = nil,
+                    run: @escaping @MainActor ([pid_t: Set<UInt32>]) -> Void) {
         if !missed.isEmpty {
-            retryOffer = RetryOffer(kind: kind, at: now(), missed: missed, run: run)
-        } else if retryOffer?.kind == kind {
-            retryOffer = nil   // a later pass of the same kind got everything
+            retryOffer = RetryOffer(kind: kind, at: now(), missed: missed, run: run, retry: retry)
+        } else if let old = retryOffer, old.kind == kind {
+            // A later pass of the same kind got everything, except windows still left behind
+            // (a move that didn't land): those stay offered.
+            var kept: [pid_t: Set<UInt32>] = [:]
+            for (pid, ids) in old.missed {
+                let still = ids.filter { book.leftBehind.contains(String($0)) }
+                if !still.isEmpty { kept[pid] = still }
+            }
+            retryOffer = kept.isEmpty ? nil : RetryOffer(kind: old.kind, at: old.at, missed: kept, run: old.run, retry: old.retry)
         }
     }
 
@@ -327,10 +391,30 @@ public final class Shepherd {
         let saved = frozenStore.load()
         book.frozen = saved.copies
         if let k = saved.lastChangeKey, let at = saved.lastChangeAt { lastChange = (k, at) }
-        book.prune(running: system.runningApps())
+        let running = system.runningApps()
+        if let loaded = spotStore.load() {
+            spots.spots = loaded
+        } else {
+            var bundleByName: [String: String?] = [:]   // looked up once per app, not per entry
+            let seeded = AppSpotBook.seed(layouts: book.layouts, frozen: book.frozen, bundleFor: { [system] e in
+                if let known = bundleByName[e.app] { return known }
+                let bundle = running[pid_t(e.pid)] == e.app ? system.bundleID(pid: pid_t(e.pid)) : system.bundleID(appName: e.app)
+                bundleByName.updateValue(bundle, forKey: e.app)
+                return bundle
+            }, now: nowSeconds)
+            spots.spots = seeded
+            spotStore.save(seeded)
+            let n = seeded.values.flatMap { $0.values }.map(\.count).reduce(0, +)
+            let apps = Set(seeded.values.flatMap { $0.keys }).count
+            Log.info("app spots: seeded \(n) spots for \(apps) apps from the remembered layouts")
+        }
+        book.prune(running: running)
+        holdOpenWindows()
         let key = Screens.setupKey(system.screens())
         book.lastSetup = key
+        noteNewAtStart(key: key)
         book.snapshot(key: key, windows: system.visibleWindows(), screens: system.screens(), now: nowSeconds)
+        noteSnapshot()
     }
 }
 
@@ -342,10 +426,14 @@ public struct RestoreTiming {
     public var patience: TimeInterval = 60
     /// How long after a screen change a window that was off screen is put back when it shows up.
     public var offscreenFor: TimeInterval = 600
+    /// How long after an app launches, a screen change or a wake a window that moves
+    /// by itself is taken for macOS's or the app's guess, not your placement.
+    public var guessing: TimeInterval = 60
 
     public init(passes: [TimeInterval] = [3, 10, 20], busyRecheck: TimeInterval = 5, unsettledLimit: TimeInterval = 60,
-                patience: TimeInterval = 60) {
+                patience: TimeInterval = 60, guessing: TimeInterval = 60) {
         self.passes = passes; self.busyRecheck = busyRecheck; self.unsettledLimit = unsettledLimit; self.patience = patience
+        self.guessing = guessing
     }
 
     public static let standard = RestoreTiming()

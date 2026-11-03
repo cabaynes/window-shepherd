@@ -5,7 +5,8 @@ public enum JobProblem: Equatable {
 }
 
 public enum JobKind: String {
-    case move, restore
+    /// `place`: new windows going to free app spots.
+    case move, restore, place
 }
 
 /// One step of a job. It may queue more steps through the context, and may

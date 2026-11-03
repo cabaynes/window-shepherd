@@ -83,7 +83,7 @@ Who it's probably **not** for. Say this kindly, in the FAQ:
 
 - Fine-grained tiling (thirds, sixths, ninths), drag-to-snap, ultrawide layouts: Rectangle is where those features live.
 - Named layouts you switch between, or layouts that launch apps: Rectangle Pro, Moom and Stay do that.
-- Restoring windows after a restart.
+- Restoring the same pages in the same windows after a restart (it only puts each app's windows back in the app's usual spots). **[verify at release]**
 
 ---
 
@@ -208,7 +208,7 @@ Checked against `main` at 9191ace and the parity checklist (all 37 lines live-te
 - Windows minimized, hidden or on another Space are kept **30 days**, then forgotten (`LayoutBook.swift:28`).
 - Survives quitting and reopening Window Shepherd (tested live).
 - **Limits:**
-  - Windows of an app that was quit or relaunched, and windows after a restart, are new to macOS, so they aren't restored. Workaround to put in the FAQ: ⌃⌥⌘2 sends all of an app's windows to the big screen in one go.
+  - After an app relaunch or a restart, each app's windows go back to that app's usual spots; which page lands in which window may differ. **[verify at release]**
   - **First visit to a new monitor:** nothing to restore yet.
   - **Sleep, wake and the lid:** there's no special handling. The 2 s check notices the new setup after wake, so it should work. **[verify at release]**
   - **Three or more displays, native full-screen windows, Stage Manager, Sidecar/AirPlay, docks and hubs:** untested. **[verify at release]**
@@ -376,7 +376,7 @@ Never claim to be the only one.
 3. **Do I have to save layouts?** No. It keeps track as you go, separately for each screen setup.
 4. **What happens the first time I plug into a new monitor?** There's nothing to remember yet, so you arrange things once. After that, it puts them back every time.
 5. **Does it work when I close the lid, or after sleep?** **[verify at release]** Draft answer if it holds: "Yes. When the screens change, including after sleep or with the lid closed at your desk, it puts your windows back for that setup."
-6. **Does it restore windows after a restart, or after an app restarts?** Not yet. It puts back windows that stayed open; a window reopened after a restart is new to macOS. When Chrome restarts for an update, I press ⌃⌥⌘2 to send all its windows to the big screen in one go.
+6. **Does it restore windows after a restart, or after an app restarts?** **[verify at release]** Draft answer if it holds: "Yes. It remembers where each app's windows go, so after a restart or an update relaunch they go back to their usual spots. With several browser windows, the pages may come back in a different one of them."
 7. **Do I have to uninstall Rectangle?** No. They work side by side, sharing only a couple of shortcuts, and Window Shepherd steps aside on those while Rectangle runs.
 8. **Why does it need Accessibility permission?** Use the "How to start" reassurance text (4.4).
 9. **Will it slow my Mac down?** I built it so a frozen app can't hold it up, and its only background work is a light check every 2 seconds. (Add the idle CPU figure once measured.)
@@ -420,7 +420,7 @@ Never claim to be the only one.
 ### Claims we must never make
 
 - That macOS puts nothing back on replug (it puts some back).
-- That it restores windows after a restart or app relaunch.
+- That it restores windows after a restart or app relaunch, until verified live; that each page comes back in the same window.
 - That it's the only app that restores windows automatically, or the only free one (Monitor Glue, and Stay is free).
 - That Rectangle "can't" do something. Say it's built around one window at a time.
 - That the single-window keys "match Rectangle's defaults". Only the halves, full and center match its Spectacle-style set.
@@ -444,7 +444,7 @@ Never claim to be the only one.
   - the origin line about the frozen laptop
   - the honest macOS line
 - **In the FAQ:**
-  - the restart and relaunch limit (with the ⌃⌥⌘2 workaround)
+  - restart and relaunch: windows go back to the app's usual spots, but pages may land in a different window (**[verify at release]**)
   - the first visit to a new monitor
   - lid, sleep, Spaces, Stage Manager, Zoom, ultrawide, identical monitors, docks, three monitors
   - the 3/10/20 s timing, 30 days, changing shortcuts, the two shared Rectangle keys
@@ -532,7 +532,7 @@ Settled 2026-10-24: the headline (Charles's own), the "different monitor setups"
   - Spaces, Stage Manager, Sidecar, three monitors and CPU are added to the FAQ and the verify list.
 - **Two-desks product manager:**
   - Moment 1 now leads with two desks.
-  - The first visit, the Chrome-relaunch workaround and "can't pick out some Chrome windows" are covered.
+  - The first visit, the relaunch answer and "can't pick out some Chrome windows" are covered.
   - The ladder is taught in four lines, with the corners exception.
   - Ultrawide, docks and Zoom are in the FAQ.
   - The red icon is reworded.

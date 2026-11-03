@@ -7,6 +7,11 @@ public protocol WindowHandle: AnyObject {
     var windowID: UInt32? { get }
     func frame() -> CGRect?
     func setFrame(_ r: CGRect) throws
+    /// Whether this is an ordinary document window (not a dialog, palette or
+    /// panel); nil when the app doesn't say.
+    var isStandard: Bool? { get }
+    /// Whether the app lets the window's size change.
+    var isResizable: Bool { get }
 }
 
 public struct AXFailure: Error, Equatable {
@@ -27,6 +32,10 @@ public protocol WindowSystem: AnyObject {
     func runningApps() -> [pid_t: String]        // main
     func isRunning(bundleID: String) -> Bool     // main
     func appName(pid: pid_t) -> String?          // main
+    func bundleID(pid: pid_t) -> String?         // main
+    /// The bundle ID of the app with this name: running, else installed. For the one-time seed only.
+    func bundleID(appName: String) -> String?    // main
+    func launchDate(pid: pid_t) -> Date?         // main
     /// When the left mouse button was last pressed or dragged, in any app:
     /// a window that moved without it was moved by macOS or its app, not by you.
     func lastMouseUse() -> Date?                 // main

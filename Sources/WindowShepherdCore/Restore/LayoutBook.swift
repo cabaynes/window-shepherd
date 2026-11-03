@@ -24,6 +24,8 @@ public struct RestoreTarget: Equatable {
     public let from: Spot?
     /// Centre it at its own size on the screen instead of using `unit`.
     public var keepSize = false
+    /// It has no per-window entry for this setup: a free spot for its app was picked.
+    public var fromAppSpot = false
 }
 
 /// What the last restore plan made of each remembered window, for the log.
@@ -42,6 +44,13 @@ public struct FrozenCopy: Codable, Equatable {
     public var layout: [String: LayoutEntry]
     public var at: Double
     public init(layout: [String: LayoutEntry], at: Double) { self.layout = layout; self.at = at }
+}
+
+/// What a snapshot changed: anything at all, and which windows' confirmed
+/// spot moved from an earlier entry (first recordings aren't moves).
+public struct SnapshotResult: Equatable {
+    public var changed = false
+    public var moved = Set<String>()
 }
 
 /// Forget remembered windows not seen for this long.
@@ -112,11 +121,11 @@ public final class LayoutBook {
 
     /// Record where windows are. A spot counts only when seen twice in a row
     /// (2 s apart), so a check that lands mid-unplug, after macOS shoved
-    /// windows aside, can't overwrite the layout. Returns true if it changed.
+    /// windows aside, can't overwrite the layout.
     @discardableResult
-    public func snapshot(key: String, windows: [CGWindow], screens: [ScreenInfo], now: Double) -> Bool {
+    public func snapshot(key: String, windows: [CGWindow], screens: [ScreenInfo], now: Double) -> SnapshotResult {
         var layout = layouts[key] ?? [:]
-        var changed = false
+        var result = SnapshotResult()
         var seenNow: [String: Spot] = [:]
         for w in windows {
             guard let spot = Geometry.whereIs(w.frame, in: screens) else { continue }
@@ -129,17 +138,18 @@ public final class LayoutBook {
             }
             layout[id]?.seen = now
             if Geometry.sameSpot(spot, lastSeenAt[id]) && protect[id] == nil && !offscreen.contains(id) {
-                if !Geometry.sameSpot(spot, layout[id]?.spot) { changed = true }
+                if let old = layout[id], !Geometry.sameSpot(spot, old.spot) { result.moved.insert(id) }
+                if !Geometry.sameSpot(spot, layout[id]?.spot) { result.changed = true }
                 layout[id] = LayoutEntry(pid: w.pid, app: w.app, scr: spot.scr, unit: spot.unit, seen: now)
             }
         }
         lastSeenAt = seenNow
         for (id, e) in layout where now - e.seen > forgetAfter {
             layout[id] = nil
-            changed = true
+            result.changed = true
         }
         layouts[key] = layout
-        return changed
+        return result
     }
 
     /// Record where the windows a hotkey/menu move just placed are now,
@@ -249,15 +259,20 @@ public final class LayoutBook {
     public func dropTabSwitches(shown: [CGWindow], previous: [CGWindow]) {
         let nowIds = Set(shown.map(\.id))
         for w in shown where offscreen.contains(String(w.id)) {
-            let replaced = previous.contains { p in
-                p.pid == w.pid && p.id != w.id && !nowIds.contains(p.id)
-                    && abs(p.frame.minX - w.frame.minX) <= 1 && abs(p.frame.minY - w.frame.minY) <= 1
-                    && abs(p.frame.width - w.frame.width) <= 1 && abs(p.frame.height - w.frame.height) <= 1
-            }
-            if replaced {
+            if Self.isTabSwitch(w, shownIDs: nowIds, previous: previous) {
                 offscreen.remove(String(w.id))
                 restoredIds.insert(String(w.id))
             }
+        }
+    }
+
+    /// `w` appeared exactly where another window of its app was in `previous`,
+    /// which has just left the screen (`shownIDs` = on screen now): a tab switch.
+    public static func isTabSwitch(_ w: CGWindow, shownIDs: Set<UInt32>, previous: [CGWindow]) -> Bool {
+        previous.contains { p in
+            p.pid == w.pid && p.id != w.id && !shownIDs.contains(p.id)
+                && abs(p.frame.minX - w.frame.minX) <= 1 && abs(p.frame.minY - w.frame.minY) <= 1
+                && abs(p.frame.width - w.frame.width) <= 1 && abs(p.frame.height - w.frame.height) <= 1
         }
     }
 

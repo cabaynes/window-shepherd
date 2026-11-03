@@ -7,6 +7,8 @@ public struct RetryOffer {
     public let at: Date
     public let missed: [pid_t: Set<UInt32>]
     let run: @MainActor ([pid_t: Set<UInt32>]) -> Void
+    /// How its windows are tried again, so later misses can join the same offer.
+    var retry: Landing.Retry? = nil
 }
 
 /// "Safari — Title", or just the app, at most 58 characters.
