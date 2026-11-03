@@ -9,6 +9,8 @@ final class Landing: @unchecked Sendable {
         let resizable: Bool
         let at: Double
         let retry: Retry
+        /// Real time, set on the worker as it's made (`lastMouseUse` is real time; `at` is the engine's clock).
+        var movedAt = Date()
     }
 
     /// How the Retry row tries a window again: the same move (its placer and label),
@@ -61,10 +63,13 @@ extension Shepherd {
         let due = landing.due(now: nowSeconds, after: Self.landingCheckAfter)
         guard !due.isEmpty else { return }
         let byID = Dictionary(visible.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+        let mouse = system.lastMouseUse()
         var misses: [(Landing.Expect, CGWindow)] = []
         for e in due {
             // Asked before the last screen change: its target was for the old setup.
             guard e.at >= book.changedAt, let w = byID[e.id] else { continue }   // closed, minimized, another Space
+            // The mouse was used since: you may have dragged it, and where you put it is yours (the snapshot records it).
+            if let mouse, mouse > e.movedAt { continue }
             if !Self.landed(w.frame, wanted: e.wanted, resizable: e.resizable) { misses.append((e, w)) }
         }
         guard !misses.isEmpty else { return }

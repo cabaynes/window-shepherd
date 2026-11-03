@@ -295,6 +295,112 @@ final class LandingTests: XCTestCase {
         XCTAssertEqual(s.book.layouts[key]?["1"]?.spot.unit, s.book.frozen[key]?.layout["1"]?.unit, "its entry is the frozen one")
     }
 
+    /// You drag it with the mouse.
+    func drag(_ id: UInt32, to r: CGRect) {
+        sys.locked { sys.mouseUsed = Date() }
+        move(id, to: r)
+    }
+
+    func testDragBeforeTheCheckIsYours() async {
+        addApp(10, "Safari", windows: [(1, rect(100))])
+        let s = make()
+        await learnKind(s, 1)
+        await snap(s)
+        drag(1, to: rect(300))   // right after the move, before it's checked
+        later(s); later(s); later(s)
+        XCTAssertFalse(s.book.leftBehind.contains("1"))
+        XCTAssertNil(s.retryOffer)
+        XCTAssertFalse(s.flashing)
+        let there = Geometry.whereIs(rect(300), in: sys.screens())
+        XCTAssertTrue(Geometry.sameSpot(s.book.layouts[key]?["1"]?.spot, there), "recorded where you put it")
+        XCTAssertTrue((s.spots.spots[key]?["test.Safari"] ?? []).contains { Geometry.sameSpot($0.spot, there) },
+                      "\(s.spots.spots[key]?["test.Safari"] ?? [])")
+    }
+
+    func testAppSpotMissStillFreesTheSpotAfterALongJob() async {
+        addApp(10, "Safari", windows: [(5, rect(1500))])
+        addApp(20, "Notes", windows: [(7, rect(1600))])
+        let used = clock.timeIntervalSince1970
+        let s = make(spots: [lapKey: ["test.Safari": [AppSpot(id: "L", scr: lap.uuid, unit: sixty, used: used)],
+                                      "test.Notes": [AppSpot(id: "N", scr: lap.uuid, unit: ninety, used: used)]]])
+        await learnKind(s, 5)
+        await waitUntil { s.isMainWindow("7") != nil }
+        sys.ignorePosition = [5]
+        sys.setDelay[7] = 0.5   // Notes is slow: the restore keeps running
+        sys.allScreens = [lap]
+        move(5, to: rect(50)); move(7, to: rect(80))
+        s.screensChanged()
+        await waitUntil(4) { self.sys.setCount(5) == 1 }
+        XCTAssertNotNil(s.runner.current, "Notes is still being moved")
+        clock = clock.addingTimeInterval(11)   // past how long undo records are kept
+        s.tick()
+        await waitUntil(4) { !s.isBusy }
+        later(s)
+        XCTAssertTrue(s.book.leftBehind.contains("5"))
+        XCTAssertFalse(s.spots.holds(key: lapKey, window: "5"), "not in the spot: it stays free")
+        XCTAssertTrue(s.spots.holds(key: lapKey, window: "7"), "Notes landed in its spot")
+    }
+
+    func testRevertMissWithASlowAppRecordsNoSpot() async {
+        addApp(10, "Safari", windows: [(1, rect(1100))])
+        addApp(20, "Notes", windows: [(2, rect(1300))])
+        let s = make()
+        await learnKind(s, 1)
+        await waitUntil { s.isMainWindow("2") != nil }
+        // Freezes when you leave it without jumping the clock (a jump past a job's deadline clears it as stale).
+        s.book.minActiveToFreeze = 0
+        sys.allScreens = [lap]
+        move(1, to: rect(50)); move(2, to: rect(80))
+        s.screensChanged()
+        await waitUntil { !s.isBusy }
+        sys.allScreens = [lap, dell]
+        s.tick()
+        await waitUntil(4) { !s.isBusy }
+        move(1, to: rect(1500)); move(2, to: rect(1700))
+        s.tick(); s.tick()
+        sys.ignorePosition = [1]
+        sys.setDelay[2] = 0.5
+        s.revert()
+        await waitUntil(4) { self.sys.setCount(1) == 2 }
+        XCTAssertNotNil(s.runner.current, "Notes is still being moved")
+        clock = clock.addingTimeInterval(11)
+        s.tick()
+        await waitUntil(4) { !s.isBusy }
+        later(s)
+        XCTAssertTrue(s.book.leftBehind.contains("1"))
+        XCTAssertEqual(s.spots.spots[key]?["test.Safari"] ?? [], [], "where it ended up is no spot")
+    }
+
+    func testDragAfterAppSpotMissClearsIt() async {
+        addApp(10, "Safari", windows: [(5, rect(1500))])
+        let used = clock.timeIntervalSince1970
+        let s = make(spots: [lapKey: ["test.Safari": [AppSpot(id: "L", scr: lap.uuid, unit: sixty, used: used)]]])
+        await learnKind(s, 5)
+        sys.ignorePosition = [5]
+        sys.allScreens = [lap]
+        move(5, to: rect(50))
+        s.screensChanged()
+        await waitUntil(4) { !s.isBusy && self.sys.setCount(5) == 1 }
+        later(s)
+        XCTAssertTrue(s.book.leftBehind.contains("5"))
+        XCTAssertTrue(s.flashing)
+        drag(5, to: rect(300))
+        later(s); later(s)
+        XCTAssertFalse(s.book.leftBehind.contains("5"), "yours now")
+        XCTAssertFalse(s.flashing)
+    }
+
+    func testLandingMissStaysOfferedAfterAnEmptyRestorePass() async {
+        sys.ignorePosition = [1]
+        let s = await restoredOnce()
+        later(s)
+        XCTAssertEqual(s.retryOffer?.missed, [10: [1]])
+        s.restore()   // a later pass with nothing to put back
+        await waitUntil { !s.isBusy }
+        XCTAssertEqual(s.retryOffer?.missed, [10: [1]], "still offered")
+        XCTAssertEqual(s.retryRows()?.count, 1)
+    }
+
     func testMissBeforeAScreenChangeIsDropped() async {
         addApp(10, "Safari", windows: [(1, rect(100))])
         sys.ignorePosition = [1]

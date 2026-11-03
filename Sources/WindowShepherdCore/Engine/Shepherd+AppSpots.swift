@@ -75,10 +75,12 @@ extension Shepherd {
         spotsDirty = true
     }
 
-    /// Once per tick: save app spots if they changed, drop stale undo records.
+    /// Once per tick: save app spots if they changed, drop stale undo records (never one
+    /// whose move is still waiting to be checked: a long job delays the check).
     func spotsTick() {
-        lastRecorded = lastRecorded.filter { nowSeconds - $0.value.at < Self.lastRecordedFor }
-        heldByRestore = heldByRestore.filter { nowSeconds - $0.value < Self.lastRecordedFor }
+        let unchecked = Set(landing.pending().map { String($0) })
+        lastRecorded = lastRecorded.filter { unchecked.contains($0.key) || nowSeconds - $0.value.at < Self.lastRecordedFor }
+        heldByRestore = heldByRestore.filter { unchecked.contains($0.key) || nowSeconds - $0.value < Self.lastRecordedFor }
         guard spotsDirty else { return }
         spotsDirty = false
         spotStore.save(spots.spots)

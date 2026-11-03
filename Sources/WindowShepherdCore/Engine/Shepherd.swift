@@ -348,8 +348,15 @@ public final class Shepherd {
                     run: @escaping @MainActor ([pid_t: Set<UInt32>]) -> Void) {
         if !missed.isEmpty {
             retryOffer = RetryOffer(kind: kind, at: now(), missed: missed, run: run, retry: retry)
-        } else if retryOffer?.kind == kind {
-            retryOffer = nil   // a later pass of the same kind got everything
+        } else if let old = retryOffer, old.kind == kind {
+            // A later pass of the same kind got everything, except windows still left behind
+            // (a move that didn't land): those stay offered.
+            var kept: [pid_t: Set<UInt32>] = [:]
+            for (pid, ids) in old.missed {
+                let still = ids.filter { book.leftBehind.contains(String($0)) }
+                if !still.isEmpty { kept[pid] = still }
+            }
+            retryOffer = kept.isEmpty ? nil : RetryOffer(kind: old.kind, at: old.at, missed: kept, run: old.run, retry: old.retry)
         }
     }
 
