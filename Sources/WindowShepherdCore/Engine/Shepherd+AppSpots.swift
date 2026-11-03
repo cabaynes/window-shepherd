@@ -90,8 +90,9 @@ extension Shepherd {
 /// New windows go to a free spot for their app as soon as they settle (seen twice,
 /// sitting still), at launch, after a restart or any time after; never later.
 extension Shepherd {
-    /// Ticks a new window waits for its kind before it's left where it is.
-    static let newKindWaitLimit = 3
+    /// Ticks a new window waits for its kind before it's left where it is: one more than
+    /// the kind rules need to settle a window that's unreadable or missing from the list.
+    static let newKindWaitLimit = Shepherd.kindMissLimit + 1
     /// Seconds a ready new window waits for a running job before it's left where it is.
     static let newJobWait: Double = 10
     /// Times a new window the app moves by itself starts settling again before it's left.
@@ -108,9 +109,10 @@ extension Shepherd {
         let t = Date().timeIntervalSince1970
         let mouse = system.lastMouseUse()?.timeIntervalSince1970
         let layout = book.layouts[key] ?? [:]
-        func handled(_ id: String) -> Bool {
-            layout[id] != nil || spots.holds(key: key, window: id) || book.restoredIds.contains(id) || book.homeless.contains(id)
+        func placed(_ id: String) -> Bool {
+            spots.holds(key: key, window: id) || book.restoredIds.contains(id) || book.homeless.contains(id)
         }
+        func handled(_ id: String) -> Bool { layout[id] != nil || placed(id) }
         var ready: [CGWindow] = []
         var shown = Set<String>()
         let shownIDs = Set(visible.map(\.id))
@@ -128,7 +130,9 @@ extension Shepherd {
                 }
                 continue
             }
-            if handled(id) { leaveFirstSeen(id); continue }   // placed or remembered meanwhile
+            // Placed meanwhile. A per-window entry made since is the snapshot's own record of
+            // where it sits (while its kind is awaited), not a reason to leave it.
+            if placed(id) { leaveFirstSeen(id); continue }
             let here = Geometry.whereIs(w.frame, in: screens)
             guard Geometry.sameSpot(here, first.at) else {
                 // Moved with the mouse: you placed it (yours, and a spot).

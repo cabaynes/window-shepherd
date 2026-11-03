@@ -39,7 +39,10 @@ extension Shepherd {
                     if let known = answers.kinds[id], let isStandard = known {
                         self.kinds[key] = isStandard
                     } else if answers.kinds[id] == nil && answers.complete {
-                        self.kinds[key] = false   // not in the app's own list: a sheet
+                        // Not in the app's own list: a sheet, or a new window the list hasn't caught up with.
+                        let absent = (self.kindAbsences[key] ?? 0) + 1
+                        self.kindAbsences[key] = absent
+                        if absent >= Self.kindMissLimit { self.kinds[key] = false }
                     } else {
                         // Unreadable: ask again on a later tick, then count it as a main window.
                         let misses = (self.kindMisses[key] ?? 0) + 1
@@ -56,5 +59,6 @@ extension Shepherd {
         let existing = Set(system.allWindowIDs().map { String($0) })
         kinds = kinds.filter { existing.contains($0.key) }
         kindMisses = kindMisses.filter { existing.contains($0.key) }
+        kindAbsences = kindAbsences.filter { existing.contains($0.key) }
     }
 }

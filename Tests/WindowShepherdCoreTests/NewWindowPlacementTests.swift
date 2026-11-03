@@ -391,6 +391,40 @@ final class NewWindowPlacementTests: XCTestCase {
         await waitUntil { !s.isBusy }
     }
 
+    /// A new window can be in the window list a moment before it's in its app's own list.
+    func testWindowLateToTheAXListIsStillPlaced() async {
+        let s = make()
+        seedFreeSpot(s, ninety, on: dell)
+        sys.hiddenFromAX = [5]
+        addApp(10, "Safari", windows: [(5, rect(100))], ago: 1)
+        for _ in 0..<2 {
+            s.tick()
+            await waitUntil { s.kindsInFlight.isEmpty }
+        }
+        sys.locked { sys.hiddenFromAX = [] }
+        for _ in 0..<2 {
+            s.tick()
+            await waitUntil { s.kindsInFlight.isEmpty && !s.isBusy }
+        }
+        XCTAssertEqual(s.isMainWindow("5"), true)
+        XCTAssertEqual(sys.frameOf(5), dell90)
+    }
+
+    /// A sheet (never in its app's own list) is never placed and never becomes a spot.
+    func testNewSheetIsNeverPlaced() async {
+        let s = make()
+        seedFreeSpot(s, ninety, on: dell)
+        sys.hiddenFromAX = [5]
+        addApp(10, "Safari", windows: [(5, rect(100))], ago: 1)
+        for _ in 0..<6 {
+            s.tick()
+            await waitUntil { s.kindsInFlight.isEmpty && !s.isBusy }
+        }
+        XCTAssertEqual(s.isMainWindow("5"), false)
+        XCTAssertEqual(sys.setCount(5), 0)
+        XCTAssertEqual(spots(s, "Safari").count, 1, "only the free spot")
+    }
+
     func testUnitLabel() {
         XCTAssertEqual(Shepherd.unitLabel(ninety), "90% centered")
         XCTAssertEqual(Shepherd.unitLabel(full), "Full screen")

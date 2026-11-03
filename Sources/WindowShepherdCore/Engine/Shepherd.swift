@@ -54,6 +54,8 @@ public final class Shepherd {
     /// Apps with a kind request in flight, and how often each window came back unreadable.
     var kindsInFlight = Set<pid_t>()
     var kindMisses: [String: Int] = [:]
+    /// How often each window was missing from its app's own (fully read) window list.
+    var kindAbsences: [String: Int] = [:]
     /// When the Mac last woke (a guessing period follows).
     var wokeAt: Double?
     /// App spots changed since the last save (saved at most once per tick).
