@@ -44,6 +44,13 @@ public struct FrozenCopy: Codable, Equatable {
     public init(layout: [String: LayoutEntry], at: Double) { self.layout = layout; self.at = at }
 }
 
+/// What a snapshot changed: anything at all, and which windows' confirmed
+/// spot moved from an earlier entry (first recordings aren't moves).
+public struct SnapshotResult: Equatable {
+    public var changed = false
+    public var moved = Set<String>()
+}
+
 /// Forget remembered windows not seen for this long.
 public let forgetAfter: Double = 30 * 86400
 
@@ -112,11 +119,11 @@ public final class LayoutBook {
 
     /// Record where windows are. A spot counts only when seen twice in a row
     /// (2 s apart), so a check that lands mid-unplug, after macOS shoved
-    /// windows aside, can't overwrite the layout. Returns true if it changed.
+    /// windows aside, can't overwrite the layout.
     @discardableResult
-    public func snapshot(key: String, windows: [CGWindow], screens: [ScreenInfo], now: Double) -> Bool {
+    public func snapshot(key: String, windows: [CGWindow], screens: [ScreenInfo], now: Double) -> SnapshotResult {
         var layout = layouts[key] ?? [:]
-        var changed = false
+        var result = SnapshotResult()
         var seenNow: [String: Spot] = [:]
         for w in windows {
             guard let spot = Geometry.whereIs(w.frame, in: screens) else { continue }
@@ -129,17 +136,18 @@ public final class LayoutBook {
             }
             layout[id]?.seen = now
             if Geometry.sameSpot(spot, lastSeenAt[id]) && protect[id] == nil && !offscreen.contains(id) {
-                if !Geometry.sameSpot(spot, layout[id]?.spot) { changed = true }
+                if let old = layout[id], !Geometry.sameSpot(spot, old.spot) { result.moved.insert(id) }
+                if !Geometry.sameSpot(spot, layout[id]?.spot) { result.changed = true }
                 layout[id] = LayoutEntry(pid: w.pid, app: w.app, scr: spot.scr, unit: spot.unit, seen: now)
             }
         }
         lastSeenAt = seenNow
         for (id, e) in layout where now - e.seen > forgetAfter {
             layout[id] = nil
-            changed = true
+            result.changed = true
         }
         layouts[key] = layout
-        return changed
+        return result
     }
 
     /// Record where the windows a hotkey/menu move just placed are now,

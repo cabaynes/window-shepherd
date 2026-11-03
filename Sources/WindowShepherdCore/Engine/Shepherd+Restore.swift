@@ -12,6 +12,7 @@ extension Shepherd {
         // so it can't pause snapshots (and so auto-restore) forever.
         runner.clearIfStale(now: now())
         checkScreens()
+        spotsTick()
         updateBusy()
     }
 
@@ -62,35 +63,43 @@ extension Shepherd {
         // Don't snapshot while windows are still being put back (or moved), or
         // half-moved positions would be recorded. Never stay unsettled for long.
         if !book.settled && nowSeconds - book.changedAt > restoreTiming.unsettledLimit { book.settled = true }
-        if book.settled && runner.current == nil {
-            let shown = system.visibleWindows()
-            defer { lastTickWindows = shown }
-            if !book.offscreen.isEmpty {
-                if nowSeconds - book.changedAt > restoreTiming.offscreenFor {
-                    book.offscreen = []   // too long after the change: it's just a window you opened
-                } else {
-                    book.dropTabSwitches(shown: shown, previous: lastTickWindows)
-                }
+        guard book.settled && runner.current == nil else {
+            snapshotTimes = []   // a gap in the snapshots: a move seen after it can't be timed against the mouse
+            return
+        }
+        let shown = system.visibleWindows()
+        defer { lastTickWindows = shown }
+        if !book.offscreen.isEmpty {
+            if nowSeconds - book.changedAt > restoreTiming.offscreenFor {
+                book.offscreen = []   // too long after the change: it's just a window you opened
+            } else {
+                book.dropTabSwitches(shown: shown, previous: lastTickWindows)
             }
-            // A window that was on another Space during the restore just showed
-            // up where macOS left it: put it back now (and don't record that spot).
-            if book.offscreenVisible(shown) {
-                restore()
-                return
-            }
-            let visible = system.visibleWindows()
-            book.visibleAtLastTick = Set(visible.map { String($0.id) })
-            if !book.leftBehind.isEmpty {
-                book.resolve(windows: visible, screens: screens, existing: system.allWindowIDs())
-            }
-            if flashing && book.unresolvedVisible(visible) == 0 { setFlashing(false) }
-            requestKinds(visible)
-            let changed = book.snapshot(key: key, windows: visible, screens: screens, now: nowSeconds)
-            if changed || Date().timeIntervalSince1970 - store.lastSaved > 600 {
-                book.forgetClosed(existing: system.allWindowIDs(), running: Set(system.runningApps().keys))
-                forgetKinds()
-                store.save(book.layouts)
-            }
+        }
+        // A window that was on another Space during the restore just showed
+        // up where macOS left it: put it back now (and don't record that spot).
+        if book.offscreenVisible(shown) {
+            snapshotTimes = []
+            restore()
+            return
+        }
+        let visible = system.visibleWindows()
+        book.visibleAtLastTick = Set(visible.map { String($0.id) })
+        if !book.leftBehind.isEmpty {
+            book.resolve(windows: visible, screens: screens, existing: system.allWindowIDs())
+        }
+        if flashing && book.unresolvedVisible(visible) == 0 { setFlashing(false) }
+        requestKinds(visible)
+        let snap = book.snapshot(key: key, windows: visible, screens: screens, now: nowSeconds)
+        recordMoves(snap.moved, windows: visible, key: key, screens: screens)
+        noteSnapshot()
+        spots.touch(key: key, visible: book.visibleAtLastTick, now: nowSeconds)
+        if snap.changed || Date().timeIntervalSince1970 - store.lastSaved > 600 {
+            let existing = system.allWindowIDs()
+            book.forgetClosed(existing: existing, running: Set(system.runningApps().keys))
+            forgetKinds()
+            forgetSpots(existing: existing)
+            store.save(book.layouts)
         }
     }
 
@@ -145,8 +154,10 @@ extension Shepherd {
             return
         }
         let running = Set(system.runningApps().keys)
-        if book.forgetClosed(existing: system.allWindowIDs(), running: running) { store.save(book.layouts) }
+        let existing = system.allWindowIDs()
+        if book.forgetClosed(existing: existing, running: running) { store.save(book.layouts) }
         forgetKinds()
+        forgetSpots(existing: existing)
         let visibleNow = system.visibleWindows()
         var plan = book.restorePlan(key: key, windows: visibleNow, screens: screens, running: running)
         Log.info("restore plan: \(book.planCounts.summary)")
@@ -203,8 +214,15 @@ extension Shepherd {
                         try win.setFrame(r)
                     },
                     onMoved: { [weak self] _, t in                // later passes won't touch it again
-                        self?.book.restoredIds.insert(t.id)
-                        self?.book.homeless.remove(t.id)
+                        guard let self else { return }
+                        self.book.restoredIds.insert(t.id)
+                        // The undocked default is your own setting placing it: that counts as a spot.
+                        // (A target placed from an app spot refreshes that spot with `spots.touch` instead;
+                        // one sent to its own per-window entry records nothing.)
+                        if self.book.homeless.remove(t.id) != nil,
+                           let w = self.system.visibleWindows().first(where: { String($0.id) == t.id }) {
+                            self.recordSpot(w, key: key, screens: screens)
+                        }
                     })
         }
         let label = Screens.setupLabel(screens)

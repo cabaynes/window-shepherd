@@ -54,6 +54,15 @@ public final class Shepherd {
     /// Apps with a kind request in flight, and how often each window came back unreadable.
     var kindsInFlight = Set<pid_t>()
     var kindMisses: [String: Int] = [:]
+    /// When the Mac last woke (a guessing period follows).
+    var wokeAt: Double?
+    /// App spots changed since the last save (saved at most once per tick).
+    var spotsDirty = false
+    /// Window id → the spot it held before its latest record (nil = none) and when, kept briefly
+    /// so a move that didn't land can be undone.
+    var lastRecorded: [String: (spot: AppSpot?, at: Double)] = [:]
+    /// When the last two settled snapshots ran, oldest first (real time, like `lastMouseUse`).
+    var snapshotTimes: [Date] = []
 
     public var onAlert: ((String) -> Void)?
     public var onBusyChanged: ((Bool) -> Void)?
@@ -230,8 +239,12 @@ public final class Shepherd {
     func recordNow(_ ids: Set<String>) {
         guard !ids.isEmpty else { return }
         let screens = system.screens()
-        book.recordNow(ids: ids, key: Screens.setupKey(screens), windows: system.visibleWindows(), screens: screens, now: nowSeconds)
+        let key = Screens.setupKey(screens)
+        let windows = system.visibleWindows()
+        book.recordNow(ids: ids, key: key, windows: windows, screens: screens, now: nowSeconds)
         store.save(book.layouts)
+        guard key == book.lastSetup else { return }
+        for w in windows where ids.contains(String(w.id)) { recordSpot(w, key: key, screens: screens) }
     }
 
     /// The front app (whole app) or its front window; nil if no app is in front.
@@ -355,6 +368,7 @@ public final class Shepherd {
         let key = Screens.setupKey(system.screens())
         book.lastSetup = key
         book.snapshot(key: key, windows: system.visibleWindows(), screens: system.screens(), now: nowSeconds)
+        noteSnapshot()
     }
 }
 
@@ -366,10 +380,14 @@ public struct RestoreTiming {
     public var patience: TimeInterval = 60
     /// How long after a screen change a window that was off screen is put back when it shows up.
     public var offscreenFor: TimeInterval = 600
+    /// How long after an app launches, a screen change or a wake a window that moves
+    /// by itself is taken for macOS's or the app's guess, not your placement.
+    public var guessing: TimeInterval = 60
 
     public init(passes: [TimeInterval] = [3, 10, 20], busyRecheck: TimeInterval = 5, unsettledLimit: TimeInterval = 60,
-                patience: TimeInterval = 60) {
+                patience: TimeInterval = 60, guessing: TimeInterval = 60) {
         self.passes = passes; self.busyRecheck = busyRecheck; self.unsettledLimit = unsettledLimit; self.patience = patience
+        self.guessing = guessing
     }
 
     public static let standard = RestoreTiming()
