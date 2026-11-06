@@ -43,8 +43,8 @@ final class NewWindowPlacementTests: XCTestCase {
     }
 
     /// An app that launched `ago` seconds before now (an hour: no guessing period from its launch).
-    func addApp(_ pid: pid_t, _ name: String, windows: [(UInt32, CGRect)], ago: TimeInterval = 3600) {
-        sys.addApp(pid, name, windows: windows)
+    func addApp(_ pid: pid_t, _ name: String, windows: [(UInt32, CGRect)], ago: TimeInterval = 3600, bundle: String? = nil) {
+        sys.addApp(pid, name, windows: windows, bundle: bundle)
         sys.launched[pid] = clock.addingTimeInterval(-ago)
     }
 
@@ -67,8 +67,8 @@ final class NewWindowPlacementTests: XCTestCase {
     var dell90: CGRect { Geometry.place(ninety, in: dell.frame) }
 
     /// A free Safari spot: recorded for a window that no longer exists, then released.
-    func seedFreeSpot(_ s: Shepherd, _ unit: UnitRect, on scr: ScreenInfo, app: String = "Safari") {
-        s.spots.record(key: key, bundle: "test." + app, window: "99", at: Spot(scr: scr.uuid, unit: unit), now: clock.timeIntervalSince1970)
+    func seedFreeSpot(_ s: Shepherd, _ unit: UnitRect, on scr: ScreenInfo, app: String = "Safari", bundle: String? = nil) {
+        s.spots.record(key: key, bundle: bundle ?? "test." + app, window: "99", at: Spot(scr: scr.uuid, unit: unit), now: clock.timeIntervalSince1970)
         s.spots.release(existing: sys.allWindowIDs())
     }
 
@@ -410,6 +410,35 @@ final class NewWindowPlacementTests: XCTestCase {
         XCTAssertEqual(sys.frameOf(5), dell90)
     }
 
+    /// Late to its app's list, so the snapshot recorded where it opened; then the app moves it
+    /// itself, and the snapshot sees that move at the tick it's placed. It keeps the spot it's
+    /// being placed in: the app's move doesn't add a second one.
+    func testAppMovingANewWindowAsItIsPlacedAddsNoSpot() async {
+        let s = make()
+        seedFreeSpot(s, ninety, on: dell)
+        clock = clock.addingTimeInterval(120)   // past the guessing period after Window Shepherd started
+        sys.hiddenFromAX = [5]
+        addApp(10, "Safari", windows: [(5, rect(100))])   // ⌘N, an hour after Safari launched
+        for _ in 0..<2 {
+            s.tick()
+            await waitUntil { s.kindsInFlight.isEmpty }
+        }
+        XCTAssertNotNil(s.book.layouts[key]?["5"], "the snapshot recorded where it opened")
+        sys.locked {
+            sys.hiddenFromAX = []
+            let i = sys.windows.firstIndex { $0.id == 5 }!
+            sys.windows[i] = CGWindow(id: 5, pid: 10, app: "Safari", title: "Doc", frame: rect(200))
+        }
+        for _ in 0..<3 {
+            s.tick()
+            await waitUntil { s.kindsInFlight.isEmpty && !s.isBusy }
+        }
+        XCTAssertEqual(sys.frameOf(5), dell90)
+        let list = spots(s, "Safari")
+        XCTAssertEqual(list.count, 1, "\(list)")
+        XCTAssertTrue(s.spots.holds(key: key, window: "5"))
+    }
+
     /// A sheet (never in its app's own list) is never placed and never becomes a spot.
     func testNewSheetIsNeverPlaced() async {
         let s = make()
@@ -423,6 +452,60 @@ final class NewWindowPlacementTests: XCTestCase {
         XCTAssertEqual(s.isMainWindow("5"), false)
         XCTAssertEqual(sys.setCount(5), 0)
         XCTAssertEqual(spots(s, "Safari").count, 1, "only the free spot")
+    }
+
+    static let finder = "com.apple.finder"
+    func finderSpots(_ s: Shepherd) -> [AppSpot] { s.spots.spots[key]?[Self.finder] ?? [] }
+
+    /// Finder's Get Info panel is a standard window to macOS but has no green full-screen
+    /// button: it's left where Finder put it.
+    func testFinderGetInfoPanelIsNeverPlaced() async {
+        let s = make()
+        seedFreeSpot(s, ninety, on: dell, bundle: Self.finder)
+        sys.noFullScreenButton = [5]
+        addApp(20, "Finder", windows: [(5, rect(100))], bundle: Self.finder)
+        await settle(s, 5)
+        s.tick()
+        await waitUntil { !s.isBusy }
+        XCTAssertEqual(s.isMainWindow("5"), false)
+        XCTAssertEqual(sys.frameOf(5), rect(100))
+        XCTAssertEqual(sys.setCount(5), 0)
+        XCTAssertFalse(s.spots.holds(key: key, window: "5"))
+    }
+
+    /// Dragging a Get Info panel doesn't make its place a Finder spot.
+    func testDraggedFinderGetInfoPanelIsNotASpot() async {
+        let s = make()
+        sys.noFullScreenButton = [5]
+        addApp(20, "Finder", windows: [(5, rect(100))], bundle: Self.finder)
+        await settle(s, 5)
+        clock = clock.addingTimeInterval(120)   // past the guessing period
+        drag(5, to: rect(1500))
+        for _ in 0..<3 {
+            s.tick()
+            await waitUntil { s.kindsInFlight.isEmpty && !s.isBusy }
+        }
+        XCTAssertEqual(sys.frameOf(5), rect(1500))
+        XCTAssertEqual(finderSpots(s), [])
+    }
+
+    /// A real Finder window (it has the green button) is still placed.
+    func testFinderWindowIsStillPlaced() async {
+        let s = make()
+        seedFreeSpot(s, ninety, on: dell, bundle: Self.finder)
+        addApp(20, "Finder", windows: [(5, rect(100))], bundle: Self.finder)
+        await settle(s, 5)
+        XCTAssertEqual(sys.frameOf(5), dell90)
+    }
+
+    /// Only Finder: another app's window without the green button (a Photoshop document) is still placed.
+    func testOtherAppsWindowWithoutFullScreenButtonIsStillPlaced() async {
+        let s = make()
+        seedFreeSpot(s, ninety, on: dell, app: "Photoshop")
+        sys.noFullScreenButton = [5]
+        addApp(30, "Photoshop", windows: [(5, rect(100))], ago: 1)
+        await settle(s, 5)
+        XCTAssertEqual(sys.frameOf(5), dell90)
     }
 
     func testUnitLabel() {

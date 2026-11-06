@@ -10,6 +10,9 @@ public protocol WindowHandle: AnyObject {
     /// Whether this is an ordinary document window (not a dialog, palette or
     /// panel); nil when the app doesn't say.
     var isStandard: Bool? { get }
+    /// Whether the window has the green full-screen button (Finder's Get Info
+    /// panel is standard but has none).
+    var hasFullScreenButton: Bool { get }
     /// Whether the app lets the window's size change.
     var isResizable: Bool { get }
 }

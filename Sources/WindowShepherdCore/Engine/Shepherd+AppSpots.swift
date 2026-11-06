@@ -34,14 +34,18 @@ extension Shepherd {
     }
 
     /// Windows whose confirmed spot changed at this snapshot: yours, unless it's
-    /// a guessing period and the mouse wasn't used since the move began.
+    /// a guessing period and the mouse wasn't used since the move began. A new window
+    /// being placed is skipped: the move it shows came before the placement (the app
+    /// settling it), and the spot it's being placed in is already its own.
     func recordMoves(_ moved: Set<String>, windows: [CGWindow], key: String, screens: [ScreenInfo]) {
         guard !moved.isEmpty else { return }
         // Two sightings: the new spot was first seen at the previous snapshot,
         // so the move happened after the one before that.
         let mouse = system.lastMouseUse()
         let dragged = snapshotTimes.count == 2 && mouse.map { $0 > snapshotTimes[0] } == true
-        for w in windows where moved.contains(String(w.id)) && (dragged || !inGuessingPeriod(pid: w.pid)) {
+        let beingPlaced = placing?.key == key ? placing?.pending ?? [] : []
+        for w in windows where moved.contains(String(w.id)) && !beingPlaced.contains(String(w.id))
+            && (dragged || !inGuessingPeriod(pid: w.pid)) {
             recordSpot(w, key: key, screens: screens)
         }
     }

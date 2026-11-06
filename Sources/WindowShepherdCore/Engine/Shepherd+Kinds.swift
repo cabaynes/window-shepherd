@@ -5,6 +5,9 @@ import Foundation
 /// answers slowly simply stays unknown until it does.
 extension Shepherd {
     static let kindMissLimit = 3
+    /// Finder's Get Info panel is a standard window with no green full-screen button. Only
+    /// Finder: other apps' real windows can lack it too (Photoshop documents).
+    static let panelsWithoutFullScreenButton: Set<String> = ["com.apple.finder"]
 
     /// Is this a main window? nil = not learned yet.
     public func isMainWindow(_ id: String) -> Bool? { kinds[id] }
@@ -19,6 +22,7 @@ extension Shepherd {
             kindsInFlight.insert(pid)
             let system = self.system
             let worker = kindWorker
+            let checkButton = system.bundleID(pid: pid).map(Self.panelsWithoutFullScreenButton.contains) == true
             Task { @MainActor [weak self] in
                 let answers: (kinds: [UInt32: Bool?], complete: Bool)? = await worker.run {
                     // A failed or timed-out list says nothing about the windows: record nothing.
@@ -27,7 +31,9 @@ extension Shepherd {
                     var complete = true   // every listed window's id was read
                     for h in list {
                         guard let id = h.windowID else { complete = false; continue }
-                        if ids.contains(id) { out[id] = h.isStandard }
+                        guard ids.contains(id) else { continue }
+                        let standard = h.isStandard
+                        out[id] = standard == true && checkButton ? h.hasFullScreenButton : standard
                     }
                     return (out, complete)
                 }

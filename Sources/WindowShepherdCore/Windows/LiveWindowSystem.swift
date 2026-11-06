@@ -69,6 +69,11 @@ final class AXWindow: WindowHandle {
         return s == kAXStandardWindowSubrole
     }
 
+    var hasFullScreenButton: Bool {
+        var ref: CFTypeRef?
+        return AXUIElementCopyAttributeValue(element, kAXFullScreenButtonAttribute as CFString, &ref) == .success && ref != nil
+    }
+
     var isResizable: Bool {
         var settable = DarwinBoolean(false)
         return AXUIElementIsAttributeSettable(element, kAXSizeAttribute as CFString, &settable) == .success

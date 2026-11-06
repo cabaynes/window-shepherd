@@ -13,6 +13,7 @@ final class FakeWindowSystem: WindowSystem {
         var windowID: UInt32? { sys.locked { sys.unreadableIDs.contains(id) } ? nil : id }
         func frame() -> CGRect? { sys.locked { sys.noFrame.contains(id) ? nil : sys.windowsByID[id]?.frame } }
         var isStandard: Bool? { sys.locked { sys.unreadableKind.contains(id) ? nil : !sys.nonStandard.contains(id) } }
+        var hasFullScreenButton: Bool { sys.locked { !sys.noFullScreenButton.contains(id) } }
         var isResizable: Bool { sys.locked { !sys.fixedSize.contains(id) } }
         func setFrame(_ r: CGRect) throws {
             let delay = sys.locked { sys.setDelay[id] ?? 0 }
@@ -46,6 +47,7 @@ final class FakeWindowSystem: WindowSystem {
     var launched: [pid_t: Date] = [:]
     var nonStandard: Set<UInt32> = []            // subrole isn't standard (dialogs, palettes)
     var unreadableKind: Set<UInt32> = []         // the subrole can't be read (isStandard nil)
+    var noFullScreenButton: Set<UInt32> = []     // no green full-screen button (Finder's Get Info, Photoshop documents)
     var staleFrameOnce: Set<UInt32> = []         // the next window list after a setFrame still shows the old frame
     var staleFrames: [UInt32: CGRect] = [:]
     var bundleByName: [String: String] = [:]     // apps that aren't running, found by name
