@@ -497,9 +497,12 @@ Never claim to be the only one.
 Settled 2026-10-24: the headline (Charles's own), the "different monitor setups" wording (4.1), and the Chrome/VS Code line (4.2).
 
 1. The story: approve the rewritten version (4.3). Decide on the optional lines: the AI line, "used it every day since…", photo, link.
+   Claude's recommendation (2026-11-07): approve it; keep the AI line (honest, one sentence, and it's what a portfolio reader will ask); keep "used it every day since…" with the month the Hammerspoon version started; no photo (the page is about the windows); link to cccccccharles.github.io rather than LinkedIn.
 2. ~~Intel support: build universal, or say Apple Silicon only.~~ Settled 2026-11-07: universal.
 3. The bug-report channel: GitHub Issues only, or an email address too.
+   Claude's recommendation: GitHub Issues only at launch. An address gets spam and needs answering privately; Issues are public, so one report helps everyone with the same problem. Add an address later if people without GitHub accounts ask.
 4. Whether to show the shortcut table on the page (expandable) or only link to the README.
+   Claude's recommendation: link to the README. The agreed direction (section 3) is a short page with the detail in the README, and one table to keep current is easier than two.
 
 ---
 
