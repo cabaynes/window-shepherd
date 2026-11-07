@@ -306,7 +306,7 @@ Keyboard order: ⌃ ⌥ ⌘ key ⇧. ⌃ = Control, ⌥ = Option, ⌘ = Command,
 ### 5.9 Requirements and install
 
 - **macOS 14 Sonoma or later** (`project.yml`).
-- **Apple Silicon only, today.** The current Release build is arm64-only (checked with `lipo`). Either set `ARCHS` for a universal build before release, or say "Apple Silicon Macs". **[verify at release]** **[Charles?]**
+- **Apple Silicon and Intel.** Settled 2026-11-07: the Release build is universal (`lipo`: x86_64 arm64, the app and Sparkle). It has never run on a real Intel Mac: run it once on one before the page says "Intel". **[verify at release]**
 - Accessibility onboarding notices the permission by itself. Launch at Login is on by default and can be switched off in the menu.
 - Updates: ⧉ → Check for Updates….
 - Download: signed and notarized from GitHub Releases, plus `brew install --cask cabaynes/tap/window-shepherd`. Both are pending enrollment.
@@ -384,7 +384,7 @@ Never claim to be the only one.
 11. **What about other desktops (Spaces), full screen apps, Stage Manager or Zoom?** Moves work on the windows you can see. Windows on other desktops are left where they are, and Zoom's floating controls are never moved. Full-screen apps and Stage Manager haven't been tested yet. **[verify at release]**
 12. **Does it work with two identical monitors, docks or three monitors?** **[verify at release]** for each before answering yes. The honest answer today: "Screens are numbered 1 for the laptop, then left to right. I've only tested it with one monitor so far."
 13. **Does it work on an ultrawide?** Yes, though halves on an ultrawide are big and there are no thirds. Rectangle is better for that.
-14. **Which Macs does it run on?** macOS 14 Sonoma or later. Apple Silicon only, or also Intel, depends on the release build. **[Charles?]** **[verify at release]**
+14. **Which Macs does it run on?** macOS 14 Sonoma or later, on Apple Silicon or Intel. **[verify at release: run once on an Intel Mac]**
 15. **Is my data collected?** No. Nothing leaves your Mac except the update check. Link PRIVACY.md.
 16. **Aren't there other apps that do this?** Use the 6.2 wording.
 17. **How do I uninstall it?** Quit it from the menu and drag it to the Trash (see 5.9 for removing everything).
@@ -427,7 +427,7 @@ Never claim to be the only one.
 - That it "can't" slow your Mac, or "never waits" on apps (it waits up to half a second).
 - That only moves talk to apps (the clash check reads menus too).
 - That it supports thirds, gaps, drag-to-snap, Stage Manager, three monitors, identical monitors, docks or sleep, until each is verified.
-- That it runs on Intel Macs, until the build is universal.
+- That it runs on Intel Macs, until it has been run on one (the build has been universal since 2026-11-07).
 - Window history for Rectangle Pro. Any user or download numbers. The Mac App Store.
 
 ---
@@ -463,7 +463,7 @@ Never claim to be the only one.
 
 1. **The replug clip.** It carries the whole page, and Charles has to record it, since Claude can't record the screen. Unedited, with a visible clock: unplug → windows pile onto the laptop → replug → windows slide back while hands stay off the keyboard. Caption: "Plug in. Wait a few seconds. That's it."
 2. **Signed, notarized download.** Apple Developer enrollment comes first.
-3. **Universal build, or say Apple Silicon only.** **[Charles?]**
+3. **Run it once on an Intel Mac.** The build is universal (2026-11-07); nobody has run it on Intel yet.
 
 **Verify on the release build, then update sections 5 and 7:**
 
@@ -496,7 +496,7 @@ Never claim to be the only one.
 Settled 2026-10-24: the headline (Charles's own), the "different monitor setups" wording (4.1), and the Chrome/VS Code line (4.2).
 
 1. The story: approve the rewritten version (4.3). Decide on the optional lines: the AI line, "used it every day since…", photo, link.
-2. Intel support: build universal, or say Apple Silicon only.
+2. ~~Intel support: build universal, or say Apple Silicon only.~~ Settled 2026-11-07: universal.
 3. The bug-report channel: GitHub Issues only, or an email address too.
 4. Whether to show the shortcut table on the page (expandable) or only link to the README.
 
@@ -545,7 +545,7 @@ Settled 2026-10-24: the headline (Charles's own), the "different monitor setups"
   - privacy now lists every read
   - the 2 s check does more than notice screens
   - "never waits" is overstated
-  - **the build is arm64-only**
+  - **the build is arm64-only** (fixed 2026-11-07: universal)
   - "Move to" rows are per size
   - identical monitors are unverified
   - the 429 list includes macOS text editing
@@ -586,7 +586,7 @@ Settled 2026-10-24: the headline (Charles's own), the "different monitor setups"
 | Clash scan limits 0.4 s per app / 3 s | `ClashScanner.swift:137-138` |
 | Launch at Login on by default | `AppDelegate.swift:94` |
 | macOS 14.0 | `App/project.yml:5,16` |
-| arm64-only Release build | `lipo` on the Release app, 2026-10-23 |
+| Universal Release build (x86_64 + arm64) | `lipo` on the Release app and its Sparkle, 2026-11-07 (arm64-only before) |
 | 166 tests, 0 failures | `swift test`, 2026-10-23 |
 | 37/37 parity lines | `docs/parity-checklist.md` |
 | macOS put most windows back itself in the replug test (Window Shepherd restored 2) | `~/Library/Logs/Window Shepherd/window-shepherd.log`, 2026-10-23 10:51 and 11:00 |

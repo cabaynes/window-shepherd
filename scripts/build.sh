@@ -8,8 +8,11 @@ scripts/fetch-sparkle.sh
 (cd App && xcodegen generate --quiet)
 LOG="build/xcodebuild-$CONFIG.log"
 mkdir -p build
+# Release builds every architecture (a universal app); Debug only this Mac's.
+DEST=()
+[ "$CONFIG" = Release ] && DEST=(-destination 'generic/platform=macOS')
 if ! xcodebuild -project App/WindowShepherd.xcodeproj -scheme WindowShepherd \
-    -configuration "$CONFIG" -derivedDataPath build/DerivedData build >"$LOG" 2>&1; then
+    -configuration "$CONFIG" ${DEST[@]+"${DEST[@]}"} -derivedDataPath build/DerivedData build >"$LOG" 2>&1; then
   grep -E "error:|BUILD FAILED" "$LOG" | head -30
   echo "Build failed; full log: $LOG"
   exit 1

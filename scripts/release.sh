@@ -30,7 +30,7 @@ else
 fi
 
 xcodebuild -project App/WindowShepherd.xcodeproj -scheme WindowShepherd -configuration Release \
-  -derivedDataPath build/DerivedData \
+  -destination 'generic/platform=macOS' -derivedDataPath build/DerivedData \
   CODE_SIGN_IDENTITY="$IDENTITY" OTHER_CODE_SIGN_FLAGS="--timestamp" \
   MARKETING_VERSION="$VERSION" CURRENT_PROJECT_VERSION="$BUILD" ${EXTRA_SETTINGS[@]+"${EXTRA_SETTINGS[@]}"} build >build/release.log 2>&1 \
   || { grep -E "error:" build/release.log | head -20; echo "build failed: build/release.log"; exit 1; }

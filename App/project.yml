@@ -40,3 +40,7 @@ targets:
       configs:
         Debug:
           CODE_SIGN_ENTITLEMENTS: WindowShepherd/WindowShepherd-Debug.entitlements
+        Release:
+          # Universal: Apple Silicon and Intel Macs (macOS 14 runs on both).
+          ARCHS: $(ARCHS_STANDARD)
+          ONLY_ACTIVE_ARCH: NO
