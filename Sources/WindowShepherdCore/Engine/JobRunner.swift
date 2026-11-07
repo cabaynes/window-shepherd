@@ -20,10 +20,21 @@ public final class JobContext {
     /// Index of the step now running.
     public internal(set) var index = 0
 
+    /// Run once when the job ends, however it ends (done, out of time, interrupted, stopped).
+    var endings: [@MainActor () -> Void] = []
+
     init(_ steps: [JobStep]) { self.steps = steps }
 
     public func insert(_ s: @escaping JobStep, at i: Int) { steps.insert(s, at: min(i, steps.count)) }
     public func append(_ s: @escaping JobStep) { steps.append(s) }
+    /// Something that must be undone even if the job is cut short.
+    public func onEnd(_ f: @escaping @MainActor () -> Void) { endings.append(f) }
+
+    func end() {
+        let e = endings
+        endings = []
+        for f in e { f() }
+    }
 }
 
 /// Runs a job one small step at a time, with a short gap between steps so
@@ -37,6 +48,7 @@ public final class JobRunner {
         let kind: JobKind
         let deadline: Date
         let done: @MainActor (JobProblem?) -> Void
+        let ctx: JobContext
         var task: Task<Void, Never>?
     }
 
@@ -55,12 +67,13 @@ public final class JobRunner {
         if let old = active {
             active = nil
             old.task?.cancel()
+            old.ctx.end()
             old.done(.interrupted)
         }
         nextID += 1
         let id = nextID
         let ctx = JobContext(steps)
-        active = Active(id: id, kind: kind, deadline: Date().addingTimeInterval(seconds), done: done)
+        active = Active(id: id, kind: kind, deadline: Date().addingTimeInterval(seconds), done: done, ctx: ctx)
         onBusyChanged?()
         let task = Task { @MainActor [weak self] in
             guard let self else { return }
@@ -91,6 +104,7 @@ public final class JobRunner {
     private func finish(_ id: Int, _ problem: JobProblem?) {
         guard let job = active, job.id == id else { return }
         active = nil
+        job.ctx.end()
         job.done(problem)
         onBusyChanged?()
     }
@@ -101,6 +115,7 @@ public final class JobRunner {
         guard let job = active else { return }
         active = nil
         job.task?.cancel()
+        job.ctx.end()
         if let reportAs { job.done(reportAs) }
         onBusyChanged?()
     }
@@ -112,6 +127,7 @@ public final class JobRunner {
         Log.info("cleared a stale job")
         active = nil
         job.task?.cancel()
+        job.ctx.end()
         onBusyChanged?()
     }
 }

@@ -47,4 +47,8 @@ public protocol WindowSystem: AnyObject {
     func appWindows(pid: pid_t) throws -> [WindowHandle]   // worker
     func focusedWindow(pid: pid_t) -> WindowHandle?        // worker
     func activate(pid: pid_t)                              // worker
+    /// Switches the app's AXEnhancedUserInterface off if it's on (it animates every move and
+    /// drops a position set mid-animation); true if it was on, so the caller switches it back.
+    func enhancedUIOff(pid: pid_t) -> Bool                 // worker
+    func enhancedUIOn(pid: pid_t)                          // worker
 }

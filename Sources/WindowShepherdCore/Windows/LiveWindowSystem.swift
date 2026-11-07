@@ -17,6 +17,25 @@ final class AXWindow: WindowHandle {
         flippedLock.lock(); defer { flippedLock.unlock() }
         return flipped.insert(pid).inserted
     }
+    static let enhanced = "AXEnhancedUserInterface" as CFString
+
+    /// Off if on; true if it was on.
+    static func enhancedOff(_ pid: pid_t) -> Bool {
+        let app = LiveWindowSystem.appElement(pid)
+        var ref: CFTypeRef?
+        let wasOn = AXUIElementCopyAttributeValue(app, enhanced, &ref) == .success && (ref as? Bool) == true
+        guard wasOn else { return false }
+        AXUIElementSetAttributeValue(app, enhanced, kCFBooleanFalse)
+        if firstFlip(pid) {
+            Log.info("\(NSRunningApplication(processIdentifier: pid)?.localizedName ?? "pid \(pid)") has enhanced UI on: switching it off while moving its windows")
+        }
+        return true
+    }
+
+    static func enhancedOn(_ pid: pid_t) {
+        AXUIElementSetAttributeValue(LiveWindowSystem.appElement(pid), enhanced, kCFBooleanTrue)
+    }
+
     let element: AXUIElement
     init(_ e: AXUIElement) {
         element = e
@@ -41,17 +60,12 @@ final class AXWindow: WindowHandle {
         // and assistive tools) animates every move and drops a position set
         // mid-animation: Chrome kept the new size but not the new screen
         // (live, 2026-10-20). Off for the move, back on after, as Rectangle does.
+        // A bulk move switches it off once for all of an app's windows (`appStep`); then
+        // this finds it off and only reads it.
         var pid: pid_t = 0
         AXUIElementGetPid(element, &pid)
-        let app = LiveWindowSystem.appElement(pid)
-        let enhanced = "AXEnhancedUserInterface" as CFString
-        var ref: CFTypeRef?
-        let wasOn = AXUIElementCopyAttributeValue(app, enhanced, &ref) == .success && (ref as? Bool) == true
-        if wasOn { AXUIElementSetAttributeValue(app, enhanced, kCFBooleanFalse) }
-        if wasOn && Self.firstFlip(pid) {
-            Log.info("\(NSRunningApplication(processIdentifier: pid)?.localizedName ?? "pid \(pid)") has enhanced UI on: switching it off for each move")
-        }
-        defer { if wasOn { AXUIElementSetAttributeValue(app, enhanced, kCFBooleanTrue) } }
+        let wasOn = Self.enhancedOff(pid)
+        defer { if wasOn { Self.enhancedOn(pid) } }
         var err = AXError.success
         let moved = applyFrame(r,
                        setSize: { set(kAXSizeAttribute, $0) },
@@ -126,6 +140,8 @@ public final class LiveWindowSystem: WindowSystem {
 
     public func lastMouseUse() -> Date? { mouseUsed }
     public func lastMouseDrag() -> Date? { mouseDragged }
+    public func enhancedUIOff(pid: pid_t) -> Bool { AXWindow.enhancedOff(pid) }
+    public func enhancedUIOn(pid: pid_t) { AXWindow.enhancedOn(pid) }
 
     public func visibleWindows() -> [CGWindow] { CGWindow.current() }
     public func allWindowIDs() -> Set<UInt32> { CGWindow.allIDs() }

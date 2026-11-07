@@ -16,6 +16,15 @@ final class FakeWindowSystem: WindowSystem {
         var hasFullScreenButton: Bool { sys.locked { !sys.noFullScreenButton.contains(id) } }
         var isResizable: Bool { sys.locked { !sys.fixedSize.contains(id) } }
         func setFrame(_ r: CGRect) throws {
+            // As AXWindow does: an app with enhanced UI on has it switched off for the move, then on.
+            if let pid = sys.locked({ sys.windowsByID[id]?.pid }), sys.enhancedUIOff(pid: pid) {
+                defer { sys.enhancedUIOn(pid: pid) }
+                try move(r)
+                return
+            }
+            try move(r)
+        }
+        private func move(_ r: CGRect) throws {
             let delay = sys.locked { sys.setDelay[id] ?? 0 }
             if delay > 0 { Thread.sleep(forTimeInterval: delay) }
             if sys.locked({ sys.failSet.contains(id) }) { throw AXFailure(code: -25200) }
@@ -69,6 +78,8 @@ final class FakeWindowSystem: WindowSystem {
     var offSpace: Set<UInt32> = []
     var mouseUsed: Date?                         // the last left-button press or drag
     var mouseDragged: Date?                      // the last left-button drag
+    var enhancedUI: Set<pid_t> = []              // apps with AXEnhancedUserInterface on (Chrome under assistive tools)
+    var enhancedOffCount: [pid_t: Int] = [:]     // times it was switched off
     var noFrame: Set<UInt32> = []                // frame() fails for these (the app didn't answer)               // exist (another Space, minimized) but aren't on screen
 
     var windowsByID: [UInt32: CGWindow] { Dictionary(uniqueKeysWithValues: windows.map { ($0.id, $0) }) }
@@ -106,6 +117,14 @@ final class FakeWindowSystem: WindowSystem {
     func launchDate(pid: pid_t) -> Date? { locked { launched[pid] } }
     func lastMouseUse() -> Date? { locked { mouseUsed } }
     func lastMouseDrag() -> Date? { locked { mouseDragged } }
+    func enhancedUIOff(pid: pid_t) -> Bool {
+        locked {
+            guard enhancedUI.remove(pid) != nil else { return false }
+            enhancedOffCount[pid, default: 0] += 1
+            return true
+        }
+    }
+    func enhancedUIOn(pid: pid_t) { _ = locked { enhancedUI.insert(pid) } }
 
     func appWindows(pid: pid_t) throws -> [WindowHandle] {
         let behaviour: ListBehaviour = locked {

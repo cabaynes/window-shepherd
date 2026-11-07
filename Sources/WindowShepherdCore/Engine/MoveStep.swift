@@ -128,6 +128,18 @@ public func appStep<V>(pid: pid_t, wanted: [UInt32: V], system: WindowSystem, wo
         let dead = Flag()
         var pos = ctx.index
         let found = Set(listed.compactMap(\.0)).intersection(wanted.keys)
+        // Enhanced UI off once for all its windows, not per window (each switch back on makes
+        // Chrome rebuild its accessibility tree); back on after them, or when the job ends early.
+        var enhancedBack: @MainActor () -> Void = {}
+        if !found.isEmpty, await worker.run({ system.enhancedUIOff(pid: pid) }) {
+            let back = Flag()
+            enhancedBack = {
+                guard !back.on else { return }
+                back.on = true
+                Task { await worker.run { system.enhancedUIOn(pid: pid) } }
+            }
+            ctx.onEnd(enhancedBack)
+        }
         var yours = 0
         var refused: [Int32] = []   // AX error codes of moves that failed
         var refusedIDs = Set<UInt32>()
@@ -160,6 +172,7 @@ public func appStep<V>(pid: pid_t, wanted: [UInt32: V], system: WindowSystem, wo
         }
         // After its windows: say why any it wanted didn't move (a give-up says so itself).
         ctx.insert({ _ in
+            enhancedBack()
             guard !dead.on, gate(), done.count < wanted.count else { return nil }
             var line = "\(name): \(wanted.count) to move, \(found.count) in its window list, \(done.count) moved"
             if yours > 0 { line += ", \(yours) left where you put them" }

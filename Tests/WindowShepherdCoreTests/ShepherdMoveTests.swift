@@ -289,4 +289,31 @@ final class ShepherdMoveTests: XCTestCase {
         XCTAssertEqual(ctx.total, 4)
         XCTAssertEqual(ctx.others.map(\.name), ["Arc", "Mail"])
     }
+
+    /// Chrome under assistive tools: its enhanced UI is switched off once for all its windows
+    /// in a bulk move (each switch back on makes it rebuild its accessibility tree), and back on after.
+    func testBulkMoveSwitchesEnhancedUIOffOncePerApp() async {
+        sys.addApp(10, "Google Chrome", windows: [(1, rect(100)), (2, rect(150)), (3, rect(200))])
+        sys.enhancedUI = [10]
+        let s = make()
+        s.apply(Selection(pid: 10), placer: .fraction(0.9, on: .fixed(uuid: dell.uuid)), label: "DELL (90%)")
+        await waitUntil { !s.isBusy && self.sys.locked { self.sys.enhancedUI.contains(10) } }
+        XCTAssertEqual(sys.setCount(1) + sys.setCount(2) + sys.setCount(3), 3)
+        XCTAssertEqual(sys.locked { sys.enhancedOffCount[10] }, 1)
+        XCTAssertTrue(sys.locked { sys.enhancedUI.contains(10) }, "back on after")
+    }
+
+    /// A newer move interrupting the job mid-app still switches it back on.
+    func testEnhancedUIComesBackOnWhenTheMoveIsInterrupted() async {
+        sys.addApp(10, "Google Chrome", windows: [(1, rect(100)), (2, rect(150)), (3, rect(200))])
+        sys.addApp(20, "Finder", windows: [(4, rect(300))])
+        sys.enhancedUI = [10]
+        sys.setDelay = [1: 0.3]
+        let s = make()
+        s.apply(Selection(pid: 10), placer: .fraction(0.9, on: .fixed(uuid: dell.uuid)), label: "DELL (90%)")
+        await waitUntil { self.sys.locked { !self.sys.enhancedUI.contains(10) } }
+        s.apply(Selection(pid: 20), placer: .fraction(0.9, on: .own), label: "90%")   // interrupts it
+        await waitUntil(2) { !s.isBusy && self.sys.locked { self.sys.enhancedUI.contains(10) } }
+        XCTAssertTrue(sys.locked { sys.enhancedUI.contains(10) }, "never left off")
+    }
 }
