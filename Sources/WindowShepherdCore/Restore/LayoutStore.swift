@@ -15,15 +15,32 @@ public final class LayoutStore {
 
     public init(url: URL = LayoutStore.defaultURL) { self.url = url }
 
-    /// Missing or damaged file → start empty (logged), never a crash.
+    /// Missing or unreadable file → start empty (logged), never a crash. A damaged entry
+    /// costs only itself: the rest are kept (logged with how many were dropped).
     public func load() -> [String: [String: LayoutEntry]] {
         guard let data = try? Data(contentsOf: url) else { return [:] }
+        let raw: [String: [String: Lenient]]
         do {
-            return try JSONDecoder().decode([String: [String: LayoutEntry]].self, from: data)
+            raw = try JSONDecoder().decode([String: [String: Lenient]].self, from: data)
         } catch {
             Log.info("remembered layouts were damaged; starting fresh (\(error.localizedDescription))")
             return [:]
         }
+        var out: [String: [String: LayoutEntry]] = [:]
+        var dropped = 0
+        for (key, entries) in raw {
+            for (id, e) in entries {
+                if let entry = e.entry { out[key, default: [:]][id] = entry } else { dropped += 1 }
+            }
+        }
+        if dropped > 0 { Log.info("remembered layouts: \(dropped) damaged entr\(dropped == 1 ? "y" : "ies") dropped, the rest kept") }
+        return out
+    }
+
+    /// An entry that may not decode.
+    private struct Lenient: Decodable {
+        let entry: LayoutEntry?
+        init(from decoder: Decoder) throws { entry = try? LayoutEntry(from: decoder) }
     }
 
     public func save(_ layouts: [String: [String: LayoutEntry]]) {

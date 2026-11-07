@@ -53,4 +53,31 @@ final class SanitizeTests: XCTestCase {
         XCTAssertEqual(cfg, .defaults)
         XCTAssertEqual(notes.count, 3, "notes: \(notes)")
     }
+
+    /// A saved key this keyboard lacks stays saved: written back while that shortcut is still
+    /// at its default, so switching back to the layout that has the key brings it back.
+    func testUnbindableSavedKeyIsKeptOnSave() throws {
+        let saved: [String: Any] = ["actions": ["60%": ["mods": ["alt", "cmd"], "key": "§"],
+                                                "90%": ["mods": ["alt", "cmd"], "key": "§"]]]
+        let valid: (String) -> Bool = { $0 != "§" }
+        let (cfg, _) = sanitize(saved: saved, isValidKey: valid)
+        let held = unbindableSaved(saved: saved, isValidKey: valid)
+        var edited = cfg
+        edited.actions[.almost] = Combo("j", .alt, .cmd)       // you change 90% in Customize; 60% you leave
+        let data = try XCTUnwrap(encodeForSave(edited, keeping: held))
+        let back = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        let (reloaded, _) = sanitize(saved: back)               // on a keyboard that has §
+        XCTAssertEqual(reloaded.actions[.sixty]?.key, "§", "kept")
+        XCTAssertEqual(reloaded.actions[.almost]?.key, "j", "your change wins")
+    }
+
+    /// Nothing customized but a held key: still saved (not "all defaults, store nothing").
+    func testOnlyAHeldKeyIsStillSaved() throws {
+        let saved: [String: Any] = ["menu": ["mods": ["ctrl", "alt", "cmd"], "key": "§"]]
+        let held = unbindableSaved(saved: saved, isValidKey: { $0 != "§" })
+        let data = try XCTUnwrap(encodeForSave(.defaults, keeping: held))
+        let back = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        XCTAssertEqual(sanitize(saved: back).0.menu.key, "§")
+        XCTAssertNil(encodeForSave(.defaults, keeping: [:]), "all defaults and nothing held: store nothing")
+    }
 }

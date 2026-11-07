@@ -135,6 +135,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         let model = OnboardingModel()
         model.granted = permission.isTrusted
+        model.almostKey = binder?.config.actions[.almost]?.formatted
         model.onDone = { [weak self] in self?.finishOnboarding() }
         let w = NSWindow(contentRect: .zero, styleMask: [.titled, .closable], backing: .buffered, defer: false)
         w.title = "Welcome to Window Shepherd"

@@ -278,4 +278,15 @@ final class LayoutBookTests: XCTestCase {
         store.flush()
         XCTAssertEqual(store.load(), layouts)
     }
+
+    /// One damaged entry costs only that entry, not every remembered window.
+    func testOneDamagedEntryKeepsTheRest() throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".json")
+        let good = #"{"pid":10,"app":"Safari","scr":"A","unit":{"x":0,"y":0,"w":1,"h":1},"seen":5}"#
+        let bad = #"{"pid":10,"app":"Safari","scr":"A","unit":{"x":0},"seen":5}"#
+        try #"{"K":{"1":\#(good),"2":\#(bad)},"L":{"3":\#(good)}}"#.write(to: url, atomically: true, encoding: .utf8)
+        let loaded = LayoutStore(url: url).load()
+        XCTAssertEqual(Set(loaded["K"]?.keys.map { $0 } ?? []), ["1"])
+        XCTAssertEqual(loaded["L"]?["3"]?.app, "Safari")
+    }
 }

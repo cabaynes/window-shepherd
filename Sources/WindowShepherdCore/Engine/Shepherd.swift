@@ -213,7 +213,7 @@ public final class Shepherd {
             let system = self.system
             if winId != 0 { snapping[pid, default: []].insert(winId) }
             runSnap(pid) { [weak self] in
-                let moved: UInt32?? = await AXWorker.detached {
+                let outcome: SnapOutcome = await AXWorker.detached {
                     let wins = (try? system.appWindows(pid: pid)) ?? []
                     // The window with keyboard focus first: after ⌘` Chrome focuses a
                     // window without raising it, so the list's first one is the wrong one.
@@ -221,24 +221,35 @@ public final class Shepherd {
                     let f = system.focusedWindow(pid: pid)
                     let focused = f.flatMap { $0.windowID }.flatMap { id in wins.first { $0.windowID == id } }
                     guard let target = focused ?? wins.first(where: { $0.windowID == winId }) ?? f,
-                          let frame = target.frame() ?? cgFrame,
-                          let r = placer.frame(for: frame, screens: screens, main: main),
-                          (try? target.setFrame(r)) != nil else { return nil }
+                          let frame = target.frame() ?? cgFrame else { return .noAnswer }
+                    guard let r = placer.frame(for: frame, screens: screens, main: main) else { return .nothingToDo }
+                    guard (try? target.setFrame(r)) != nil else { return .refused }
                     let id = target.windowID
                     if let id, id != 0 {
                         landing.expect(.init(pid: pid, id: id, wanted: r, resizable: target.isResizable, at: clock(),
                                              retry: .move(placer, label)))
                     }
-                    return .some(id)
+                    return .moved(id)
                 }
                 guard let self else { return }
-                if case let .some(id) = moved {
+                switch outcome {
+                case let .moved(id):
                     tally.moved = 1
                     // The screens changed meanwhile: it belongs to the old setup.
                     if let id, id != 0, self.book.lastSetup == startSetup {
                         tally.ids.insert(String(id))
                         self.book.restoredIds.insert(String(id))
                     }
+                case .noAnswer:   // name the app, and offer Retry
+                    tally.skipped.append(self.system.appName(pid: pid) ?? "the app")
+                    if winId != 0 { tally.missed[pid] = [winId: winId] }
+                case .refused:
+                    if winId != 0 {
+                        tally.refused[pid] = [winId: winId]
+                        tally.missed[pid] = [winId: winId]
+                    }
+                case .nothingToDo:
+                    break
                 }
                 finish(nil)
             }
@@ -264,6 +275,10 @@ public final class Shepherd {
         let count = byPid.values.reduce(0) { $0 + $1.count }
         runner.run(.move, steps: steps, deadline: max(deadlineFor(windowCount: count), timing.movePatience + 10), done: finish)
     }
+
+    /// How a keyboard snap went: moved (its window id, if readable), the app didn't answer
+    /// (no window or frame read), it refused the move, or the placer had nothing to do.
+    enum SnapOutcome { case moved(UInt32?), noAnswer, refused, nothingToDo }
 
     /// At most one snap per app in flight; a newer press replaces any waiting one.
     func runSnap(_ pid: pid_t, _ work: @escaping @MainActor () async -> Void) {

@@ -316,4 +316,27 @@ final class ShepherdMoveTests: XCTestCase {
         await waitUntil(2) { !s.isBusy && self.sys.locked { self.sys.enhancedUI.contains(10) } }
         XCTAssertTrue(sys.locked { sys.enhancedUI.contains(10) }, "never left off")
     }
+
+    /// A keyboard snap at an app that doesn't answer names it, and offers Retry.
+    func testSnapAtAHungAppNamesIt() async {
+        sys.addApp(10, "Hung", windows: [(1, rect(100))])
+        sys.listBehaviour[10] = .throwAlways
+        sys.front = 10
+        let s = make()
+        s.doAction(.leftHalf, wholeApp: false, nextScreen: false)
+        await waitUntil { !self.alerts.isEmpty && s.snapInFlight.isEmpty }
+        XCTAssertEqual(alerts.first?.contains("not responding: Hung"), true, "\(alerts)")
+        XCTAssertEqual(s.retryOffer?.missed, [10: [1]])
+    }
+
+    /// A snap the app refuses says so.
+    func testRefusedSnapSaysSo() async {
+        sys.addApp(10, "Safari", windows: [(1, rect(100))])
+        sys.failSet = [1]
+        sys.front = 10
+        let s = make()
+        s.doAction(.leftHalf, wholeApp: false, nextScreen: false)
+        await waitUntil { !self.alerts.isEmpty && s.snapInFlight.isEmpty }
+        XCTAssertEqual(alerts.first?.contains("1 window refused to move"), true, "\(alerts)")
+    }
 }

@@ -4,6 +4,8 @@ import SwiftUI
 final class OnboardingModel: ObservableObject {
     @Published var granted = false
     @Published var launchAtLogin = true
+    /// The 90% shortcut as it's set now (it may have been changed from ⌥⌘G); nil to give no example.
+    @Published var almostKey: String?
     var onDone: (() -> Void)?
 }
 
@@ -20,7 +22,8 @@ struct OnboardingView: View {
                     .font(.title2.weight(.semibold))
             }
             if model.granted {
-                Text("Window Shepherd is in your menu bar (⧉). Open the ⧉ menu to see everything it can do, and the keyboard shortcut for each (⌥⌘G makes the window in front 90%, for example).")
+                Text("Window Shepherd is in your menu bar (⧉). Open the ⧉ menu to see everything it can do, and the keyboard shortcut for each"
+                     + (model.almostKey.map { " (\($0) makes the window in front 90%, for example)." } ?? "."))
                     .fixedSize(horizontal: false, vertical: true)
                 Toggle("Start Window Shepherd at login", isOn: $model.launchAtLogin)
                 HStack {
