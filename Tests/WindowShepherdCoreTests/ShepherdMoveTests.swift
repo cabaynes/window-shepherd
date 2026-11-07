@@ -339,4 +339,17 @@ final class ShepherdMoveTests: XCTestCase {
         await waitUntil { !self.alerts.isEmpty && s.snapInFlight.isEmpty }
         XCTAssertEqual(alerts.first?.contains("1 window refused to move"), true, "\(alerts)")
     }
+
+    /// Without Screen Recording the window list has no titles: Retry rows use the title the
+    /// app reports through Accessibility instead of just the app's name.
+    func testRetryRowsUseAccessibilityTitles() async {
+        sys.addApp(10, "Safari", windows: [(1, rect(100))], title: nil)
+        sys.axTitles = [1: "Quarterly report"]
+        sys.failSet = [1]
+        let s = make()
+        s.apply(.everything, placer: .fraction(1, on: .own), label: "Full screen")
+        await waitUntil(3) { s.retryOffer != nil && !s.isBusy }
+        await waitUntil { s.retryRows()?.titles == ["Safari — Quarterly report"] }
+        XCTAssertEqual(s.retryRows()?.titles, ["Safari — Quarterly report"])
+    }
 }

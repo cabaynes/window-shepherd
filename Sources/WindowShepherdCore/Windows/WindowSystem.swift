@@ -13,6 +13,8 @@ public protocol WindowHandle: AnyObject {
     /// Whether the window has the green full-screen button (Finder's Get Info
     /// panel is standard but has none).
     var hasFullScreenButton: Bool { get }
+    /// The title the app reports (needs only Accessibility, unlike the window list's titles).
+    var title: String? { get }
     /// Whether the app lets the window's size change.
     var isResizable: Bool { get }
 }

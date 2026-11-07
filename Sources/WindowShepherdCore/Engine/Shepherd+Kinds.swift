@@ -67,5 +67,6 @@ extension Shepherd {
         kinds = kinds.filter { existing.contains($0.key) }
         kindMisses = kindMisses.filter { existing.contains($0.key) }
         kindAbsences = kindAbsences.filter { existing.contains($0.key) }
+        axTitles = axTitles.filter { ids.contains($0.key) }
     }
 }

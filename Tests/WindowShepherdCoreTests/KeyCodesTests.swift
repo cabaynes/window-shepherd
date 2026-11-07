@@ -26,6 +26,19 @@ final class KeyCodesTests: XCTestCase {
         XCTAssertEqual(KeyCodes.code(for: "1"), 18)
     }
 
+    /// AZERTY-style layouts type & é " ' ( … on the number row (digits need ⇧): the screen
+    /// keys still bind, to the physical number-row keys.
+    func testDigitsFallBackToTheNumberRow() {
+        let azerty: [String: UInt32] = ["&": 18, "é": 19, "a": 12]
+        let names = KeyCodes.withDigitFallbacks(azerty)
+        XCTAssertEqual(names["1"], 18)
+        XCTAssertEqual(names["2"], 19)
+        XCTAssertEqual(names["0"], 29)
+        XCTAssertEqual(names["&"], 18, "the layout's own keys stay")
+        let us: [String: UInt32] = ["1": 18, "2": 19]
+        XCTAssertEqual(KeyCodes.withDigitFallbacks(us)["1"], 18, "a layout that types digits keeps its own")
+    }
+
     func testCarbonModsRoundTrip() {
         let all: Set<Mod> = [.ctrl, .alt, .cmd, .shift]
         XCTAssertEqual(carbonModifiers([.cmd]), UInt32(cmdKey))

@@ -109,6 +109,12 @@ public func validate(_ cfg: ShortcutConfig) -> [Problem] {
                                     why: "A shortcut needs ⌃, ⌥ or ⌘, so it doesn't get in the way of typing",
                                     entries: b.entries))
         }
+        if m.contains(.alt) && m.isSubset(of: [.alt, .shift]) {
+            problems.append(Problem(combo: b.combo, owners: [b.label],
+                                    why: b.combo.formatted + " types special characters (⌥ alone, or with ⇧), and macOS 15 "
+                                       + "and later don't allow it as a shortcut. Add ⌃ or ⌘",
+                                    entries: b.entries))
+        }
         if byId[b.combo.id] == nil { order.append(b.combo.id) }
         byId[b.combo.id, default: []].append(b)
     }

@@ -90,7 +90,12 @@ public final class Shepherd {
     public var onAlert: ((String) -> Void)?
     public var onBusyChanged: ((Bool) -> Void)?
     public internal(set) var isBusy = false
-    public internal(set) var retryOffer: RetryOffer?
+    public internal(set) var retryOffer: RetryOffer? {
+        didSet { if let o = retryOffer { fetchRetryTitles(o.missed) } }
+    }
+    /// Titles of windows in the Retry row, read through Accessibility (the window list has
+    /// none without Screen Recording). Filled in the background when an offer is made.
+    var axTitles: [UInt32: String] = [:]
     /// A restore left windows behind and you haven't opened the menu since.
     public internal(set) var flashing = false
     public var onFlashChanged: ((Bool) -> Void)?
@@ -392,13 +397,34 @@ public final class Shepherd {
         }
     }
 
+    /// Reads the titles of an offer's windows off the main thread (an app that doesn't
+    /// answer costs only its own timeout there); the menu uses them when it next opens.
+    func fetchRetryTitles(_ missed: [pid_t: Set<UInt32>]) {
+        let want = missed.mapValues { $0.filter { axTitles[$0] == nil } }.filter { !$0.value.isEmpty }
+        guard !want.isEmpty else { return }
+        let system = self.system
+        Task { @MainActor [weak self] in
+            let got: [UInt32: String] = await AXWorker.detached {
+                var out: [UInt32: String] = [:]
+                for (pid, ids) in want {
+                    guard let wins = try? system.appWindows(pid: pid) else { continue }
+                    for w in wins {
+                        if let id = w.windowID, ids.contains(id), let t = w.title, !t.isEmpty { out[id] = t }
+                    }
+                }
+                return out
+            }
+            self?.axTitles.merge(got) { _, new in new }
+        }
+    }
+
     /// The retry offer's rows (sorted "App — Title"), or nil when there is
     /// none, or every window it lists has closed.
     public func retryRows() -> (count: Int, titles: [String])? {
         guard let offer = retryOffer else { return nil }
         var titles: [String] = []
         for w in system.visibleWindows() where offer.missed[w.pid]?.contains(w.id) == true {
-            titles.append(retryTitle(app: w.app, title: w.title))
+            titles.append(retryTitle(app: w.app, title: w.title?.isEmpty == false ? w.title : axTitles[w.id]))
         }
         if titles.isEmpty { retryOffer = nil; return nil }
         return (titles.count, titles.sorted())

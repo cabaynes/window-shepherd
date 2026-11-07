@@ -66,6 +66,17 @@ final class ShortcutTests: XCTestCase {
         XCTAssertTrue(problems.contains { $0.why.contains("⌃") }, "why mentions ⌃/⌥/⌘")
     }
 
+    /// ⌥ alone (or ⌥⇧) types special characters, and macOS 15+ refuses such shortcuts.
+    func testOptionOnlyBlocked() {
+        var cfg = ShortcutConfig.defaults
+        cfg.actions[.sixty] = Combo("h", .alt)
+        XCTAssertTrue(validate(cfg).contains { $0.why.contains("special characters") && $0.owners == ["60%"] })
+        cfg.actions[.sixty] = Combo("h", .alt, .shift)
+        XCTAssertFalse(validate(cfg).isEmpty, "⌥⇧ too")
+        cfg.actions[.sixty] = Combo("h", .ctrl, .alt)
+        XCTAssertTrue(validate(cfg).isEmpty, "⌃⌥ is fine")
+    }
+
     func testModifiersRules() {
         var cfg = ShortcutConfig.defaults
         cfg.wholeApp = .shift

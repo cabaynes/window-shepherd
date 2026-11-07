@@ -83,6 +83,12 @@ final class AXWindow: WindowHandle {
         return s == kAXStandardWindowSubrole
     }
 
+    var title: String? {
+        var ref: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(element, kAXTitleAttribute as CFString, &ref) == .success else { return nil }
+        return ref as? String
+    }
+
     var hasFullScreenButton: Bool {
         var ref: CFTypeRef?
         return AXUIElementCopyAttributeValue(element, kAXFullScreenButtonAttribute as CFString, &ref) == .success && ref != nil

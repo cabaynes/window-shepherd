@@ -60,8 +60,21 @@ public enum KeyCodes {
                 }
             }
         }
-        byName = names
+        byName = withDigitFallbacks(names)
         byCode = codes
+    }
+
+    /// The number row's key codes (ANSI positions; the same physical keys on every Mac keyboard).
+    private static let numberRow: [String: UInt32] = [
+        "1": 18, "2": 19, "3": 20, "4": 21, "5": 23, "6": 22, "7": 26, "8": 28, "9": 25, "0": 29,
+    ]
+
+    /// A layout whose number row types other characters without ⇧ (AZERTY: & é " ' ( …) has no
+    /// key named "1": digits then mean the number-row keys, so the screen keys still bind.
+    static func withDigitFallbacks(_ names: [String: UInt32]) -> [String: UInt32] {
+        var out = names
+        for (digit, code) in numberRow where out[digit] == nil { out[digit] = code }
+        return out
     }
 
     /// The character a key types with no modifiers on `layout`.

@@ -25,7 +25,10 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
         #else
         let snapshot: String? = nil
         #endif
-        let height: CGFloat = snapshot == nil ? 780 : 2600
+        // 780 tall, or less on a short screen (the list scrolls; the footer stays visible):
+        // a ~800 pt screen less the menu bar, the title bar and a little margin.
+        let room = (NSScreen.main?.visibleFrame.height ?? 900) - 28 - 16
+        let height: CGFloat = snapshot == nil ? min(780, max(420, room)) : 2600
         let w = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 680, height: height),
                          styleMask: [.titled, .closable, .miniaturizable], backing: .buffered, defer: false)
         w.title = "Customize Shortcuts"
