@@ -96,6 +96,13 @@ extension Shepherd {
         if let old = retryOffer, let r = old.retry {
             for (pid, ids) in old.missed { for id in ids { add(r, pid, id) } }
         }
+        offerGroups(groups, restoreAgain: restoreAgain)
+        setFlashing(true)
+    }
+
+    /// One Retry row for windows missed by different moves (and restores): picking it
+    /// runs each move again, one after another, then a restore pass for the rest.
+    func offerGroups(_ groups: [(retry: Landing.Retry, byPid: [pid_t: Set<UInt32>])], restoreAgain: Set<String>) {
         var all: [pid_t: Set<UInt32>] = [:]
         for g in groups { all.merge(g.byPid) { $0.union($1) } }
         let kind: JobKind = groups.contains { $0.retry != .restore } ? .move : .restore
@@ -116,10 +123,21 @@ extension Shepherd {
                 }
             }
             // One move after another: a second one started at once would interrupt the first.
+            // Each move's finish offers only its own misses, so the row is rebuilt from all of
+            // them once the last one is done.
+            var still: [(retry: Landing.Retry, byPid: [pid_t: Set<UInt32>])] = []
             @MainActor func next(_ i: Int) {
-                guard i < moves.count else { return }
+                guard i < moves.count else {
+                    if moves.count > 1 && !still.isEmpty { self.offerGroups(still, restoreAgain: []) }
+                    return
+                }
                 let m = moves[i]
-                self.apply(Selection(byPid: m.sub, retry: true), placer: m.placer, label: m.label) { next(i + 1) }
+                self.apply(Selection(byPid: m.sub, retry: true), placer: m.placer, label: m.label) {
+                    if let o = self.retryOffer, o.retry == .move(m.placer, m.label), !o.missed.isEmpty {
+                        still.append((.move(m.placer, m.label), o.missed))
+                    }
+                    next(i + 1)
+                }
             }
             next(0)
             guard restoreToo else { return }
@@ -128,7 +146,6 @@ extension Shepherd {
             for id in restoreAgain where self.book.protect[id] != nil { self.book.restoredIds.remove(id) }
             self.restore()   // after a move above, it waits for it
         })
-        setFlashing(true)
     }
 
     /// Where it ended up counts: the position within a few points, and the size,

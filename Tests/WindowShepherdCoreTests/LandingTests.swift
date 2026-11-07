@@ -213,6 +213,27 @@ final class LandingTests: XCTestCase {
         XCTAssertEqual(sys.frameOf(1)?.minX ?? 0, Geometry.place(ninety, in: dell.frame).minX, accuracy: 0.5)
     }
 
+    /// Both moves in a Retry miss again: the Retry row offers both windows, not only the
+    /// last move's (each move's finish used to replace the offer).
+    func testRetryOfTwoMovesThatBothMissKeepsBoth() async {
+        addApp(10, "Safari", windows: [(1, rect(100))])
+        addApp(20, "Finder", windows: [(2, rect(150))])
+        sys.ignorePosition = [1, 2]
+        let s = make()
+        s.apply(Selection(pid: 10), placer: .fraction(0.9, on: .fixed(uuid: dell.uuid)), label: "DELL (90%)")
+        await waitUntil { !s.isBusy }
+        s.apply(Selection(pid: 20), placer: .fraction(0.9, on: .own), label: "90%")
+        await waitUntil { !s.isBusy }
+        later(s)
+        XCTAssertEqual(s.retryOffer?.missed, [10: [1], 20: [2]])
+        sys.ignorePosition = []
+        sys.failSet = [1, 2]                         // both refuse this time
+        s.runRetry()
+        await waitUntil(4) { !s.isBusy && self.sys.setCount(2) >= 2 }
+        try? await Task.sleep(nanoseconds: 100_000_000)
+        XCTAssertEqual(s.retryOffer?.missed, [10: [1], 20: [2]])
+    }
+
     func testRestoreMissRetriesViaRestore() async {
         sys.ignorePosition = [1]
         let s = await restoredOnce()
