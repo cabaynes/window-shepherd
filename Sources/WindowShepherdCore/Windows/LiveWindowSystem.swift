@@ -141,20 +141,34 @@ final class AXWindow: WindowHandle {
 public final class LiveWindowSystem: WindowSystem {
     private var mouseUsed: Date?
     private var mouseDragged: Date?
+    /// The window the left button last went down on, and recent drags by the window they began on.
+    private var downWindow = 0
+    private var dragsByWindow: [UInt32: Date] = [:]
     private var mouseMonitor: Any?
 
     public init() {
         AXUIElementSetMessagingTimeout(AXUIElementCreateSystemWide(), axTimeout)
         // Only notes the time: nothing here can slow the Mac.
         mouseMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .leftMouseDragged]) { [weak self] event in
+            guard let self else { return }
             let now = Date()
-            self?.mouseUsed = now
-            if event.type == .leftMouseDragged { self?.mouseDragged = now }
+            self.mouseUsed = now
+            if event.type == .leftMouseDown {
+                // One window-server lookup per click: which window is under the mouse.
+                self.downWindow = NSWindow.windowNumber(at: NSEvent.mouseLocation, belowWindowWithWindowNumber: 0)
+            } else {
+                self.mouseDragged = now
+                if self.downWindow > 0 {
+                    if self.dragsByWindow.count > 50 { self.dragsByWindow = self.dragsByWindow.filter { now.timeIntervalSince($0.value) < 120 } }
+                    self.dragsByWindow[UInt32(self.downWindow)] = now
+                }
+            }
         }
     }
 
     public func lastMouseUse() -> Date? { mouseUsed }
     public func lastMouseDrag() -> Date? { mouseDragged }
+    public func lastMouseDrag(of id: UInt32) -> Date? { dragsByWindow[id] }
     public func enhancedUIOff(pid: pid_t) -> Bool { AXWindow.enhancedOff(pid) }
     public func enhancedUIOn(pid: pid_t) { AXWindow.enhancedOn(pid) }
 

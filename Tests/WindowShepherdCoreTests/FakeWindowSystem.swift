@@ -83,6 +83,7 @@ final class FakeWindowSystem: WindowSystem {
     var offSpace: Set<UInt32> = []
     var mouseUsed: Date?                         // the last left-button press or drag
     var mouseDragged: Date?                      // the last left-button drag
+    var mouseDraggedWindow: UInt32?              // the window that drag began on (nil: any, as before)
     var fullScreen: Set<UInt32> = []             // in native full screen (its own Space)
     var axTitles: [UInt32: String] = [:]         // titles the app reports (Accessibility)
     var allIDsReads = 0                          // full window-list reads (.optionAll: costly)
@@ -125,6 +126,9 @@ final class FakeWindowSystem: WindowSystem {
     func launchDate(pid: pid_t) -> Date? { locked { launched[pid] } }
     func lastMouseUse() -> Date? { locked { mouseUsed } }
     func lastMouseDrag() -> Date? { locked { mouseDragged } }
+    func lastMouseDrag(of id: UInt32) -> Date? {
+        locked { mouseDraggedWindow == nil || mouseDraggedWindow == id ? mouseDragged : nil }
+    }
     func enhancedUIOff(pid: pid_t) -> Bool {
         locked {
             guard enhancedUI.remove(pid) != nil else { return false }

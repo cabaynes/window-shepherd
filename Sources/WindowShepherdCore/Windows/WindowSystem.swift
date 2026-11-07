@@ -48,6 +48,9 @@ public protocol WindowSystem: AnyObject {
     func lastMouseUse() -> Date?                 // main
     /// When the left mouse button was last dragged (a click moves no window).
     func lastMouseDrag() -> Date?                // main
+    /// When a drag that began on window `id` last happened (selecting text in another
+    /// window, or dragging a file, isn't moving this one).
+    func lastMouseDrag(of id: UInt32) -> Date?   // main
     func appWindows(pid: pid_t) throws -> [WindowHandle]   // worker
     func focusedWindow(pid: pid_t) -> WindowHandle?        // worker
     func activate(pid: pid_t)                              // worker

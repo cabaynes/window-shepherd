@@ -63,13 +63,13 @@ extension Shepherd {
         let due = landing.due(now: nowSeconds, after: Self.landingCheckAfter)
         guard !due.isEmpty else { return }
         let byID = Dictionary(visible.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
-        let mouse = system.lastMouseDrag()   // a click moves no window: only a drag makes it yours
         var misses: [(Landing.Expect, CGWindow)] = []
         for e in due {
             // Asked before the last screen change: its target was for the old setup.
             guard e.at >= book.changedAt, let w = byID[e.id] else { continue }   // closed, minimized, another Space
             // Dragged since: you may have moved it, and where you put it is yours (the snapshot records it).
-            if let mouse, mouse > e.movedAt { continue }
+            // (A click moves no window, nor does a drag that began in another window.)
+            if let drag = system.lastMouseDrag(of: e.id), drag > e.movedAt { continue }
             if !Self.landed(w.frame, wanted: e.wanted, resizable: e.resizable) {
                 misses.append((e, w))
             } else if let last = lastRecorded[String(e.id)], last.at >= e.at {

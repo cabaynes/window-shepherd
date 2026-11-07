@@ -349,6 +349,17 @@ final class LandingTests: XCTestCase {
         XCTAssertEqual(sys.locked { sys.allIDsReads }, 1)
     }
 
+    /// A drag in another window (selecting text, say) doesn't make this window's miss yours.
+    func testDragInAnotherWindowStillChecks() async {
+        addApp(10, "Safari", windows: [(1, rect(100)), (2, rect(600))])
+        sys.ignorePosition = [1]
+        let s = make()
+        await snap(s)
+        sys.locked { sys.mouseUsed = Date(); sys.mouseDragged = sys.mouseUsed; sys.mouseDraggedWindow = 2 }
+        later(s)
+        XCTAssertTrue(s.book.leftBehind.contains("1"))
+    }
+
     func testDragBeforeTheCheckIsYours() async {
         addApp(10, "Safari", windows: [(1, rect(100))])
         let s = make()
