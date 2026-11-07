@@ -99,8 +99,13 @@ public final class Shepherd {
     var pendingPasses = 0
     /// A restore your own move interrupted: run it again once the move is done.
     var resumeRestore = false
-    /// A Revert that hasn't run yet (it waited for another job, or your move interrupted it).
-    var revertPending = false
+    /// A Revert that hasn't run yet (it waited for another job, or your move interrupted it):
+    /// when its patience ends (engine clock), a full patience from when you pressed it.
+    var revertPending: Double?
+    /// Where each window opened while undocked was at the last screen change, and when (real
+    /// time, to compare with mouse drags): one dragged since is yours, not the undocked default's.
+    var homelessAt: [String: Spot?] = [:]
+    var changedAtDate = Date.distantPast
     /// The window list at the last settled tick (to tell a tab switch from a window coming back).
     var lastTickWindows: [CGWindow] = []
     var restoreTimers: [Int: Task<Void, Never>] = [:]
@@ -393,6 +398,17 @@ public final class Shepherd {
     }
 
     // MARK: Lifecycle (auto-restore orchestration is in Shepherd+Restore)
+
+    /// Forget closed windows; frozen copies that lost some are saved now, not at the next screen change.
+    @discardableResult
+    func forgetClosed(existing: Set<UInt32>, running: Set<pid_t>) -> Bool {
+        let frozenBefore = book.frozen
+        let dropped = book.forgetClosed(existing: existing, running: running)
+        if book.frozen != frozenBefore {
+            frozenStore.save(FrozenState(copies: book.frozen, lastChangeKey: lastChange?.key, lastChangeAt: lastChange?.at))
+        }
+        return dropped
+    }
 
     /// At launch: no restore, just start remembering.
     public func start() {

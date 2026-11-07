@@ -59,7 +59,7 @@ final class WindowKindTests: XCTestCase {
         s.tick()
         await waitUntil { s.kinds.count == 2 }
         sys.locked { sys.windows.removeAll { $0.id == 2 } }
-        s.forgetKinds()
+        s.forgetKinds(existing: sys.allWindowIDs())
         XCTAssertEqual(s.kinds, ["1": true])
     }
 

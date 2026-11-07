@@ -193,6 +193,37 @@ final class AppSpotRecordingTests: XCTestCase {
         XCTAssertEqual(list.count, 1, "\(list)")
     }
 
+    /// A Revert that waits for another move keeps its full patience: an app slow to answer
+    /// is still retried, though the screen change was long ago.
+    func testRevertThatWaitsKeepsItsPatience() async {
+        addApp(10, "Safari", windows: [(1, rect(1100))])
+        addApp(20, "Finder", windows: [(2, rect(1600))])
+        let s = Shepherd(system: sys, store: store, spotStore: spotStore,
+                         timing: MoveTiming(retryWaits: [0.05, 0.1], movePatience: 0.3),
+                         restoreTiming: RestoreTiming(passes: [0.05, 0.15, 0.3], busyRecheck: 0.05, unsettledLimit: 1, patience: 1.5),
+                         now: { [unowned self] in self.clock })
+        s.start()
+        s.tick()
+        await waitUntil { s.isMainWindow("1") != nil }
+        clock = clock.addingTimeInterval(120)
+        sys.allScreens = [lap]
+        move(1, to: rect(50)); move(2, to: rect(60))
+        s.screensChanged()
+        await waitUntil(4) { !s.isBusy }
+        sys.allScreens = [lap, dell]
+        s.tick()
+        await waitUntil(4) { !s.isBusy }
+        move(1, to: rect(1500))
+        s.tick(); s.tick()
+        clock = clock.addingTimeInterval(120)             // the screen change's patience is long gone
+        sys.setDelay = [2: 0.3]
+        s.apply(Selection(pid: 20), placer: .fraction(0.9, on: .own), label: "90%")
+        s.revert()
+        sys.locked { sys.listCalls[10] = 0; sys.listBehaviour[10] = .throwTimes(3) }   // Safari doesn't answer 3 times
+        await waitUntil(4) { !s.isBusy && self.sys.frameOf(1)?.minX == 1100 }
+        XCTAssertEqual(sys.frameOf(1)?.minX ?? 0, 1100, accuracy: 0.5, "retried and reverted")
+    }
+
     /// As in UndockedTests: Safari remembered on the Dell; unplug; Notes window 7
     /// opens on the built-in screen; plug the Dell back in.
     func testUndockedDefaultRecordsSpot() async {

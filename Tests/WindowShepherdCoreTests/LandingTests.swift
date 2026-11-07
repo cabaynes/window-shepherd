@@ -334,6 +334,21 @@ final class LandingTests: XCTestCase {
         XCTAssertEqual(s.retryOffer?.missed, [10: [1]])
     }
 
+    /// A tick with a window left behind, that also saves, reads the full window list once.
+    func testOneFullWindowListReadPerTick() async {
+        addApp(10, "Safari", windows: [(1, rect(100)), (2, rect(500))])
+        sys.ignorePosition = [1]
+        let s = make()
+        await snap(s)
+        later(s)
+        XCTAssertTrue(s.book.leftBehind.contains("1"))
+        move(2, to: rect(600))
+        later(s)                                   // first sighting of the change
+        sys.locked { sys.allIDsReads = 0 }
+        later(s)                                   // second: the snapshot changes, so the tick saves
+        XCTAssertEqual(sys.locked { sys.allIDsReads }, 1)
+    }
+
     func testDragBeforeTheCheckIsYours() async {
         addApp(10, "Safari", windows: [(1, rect(100))])
         let s = make()

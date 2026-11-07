@@ -61,8 +61,9 @@ extension Shepherd {
     }
 
     /// Drop what we learned about windows that no longer exist.
-    func forgetKinds() {
-        let existing = Set(system.allWindowIDs().map { String($0) })
+    func forgetKinds(existing ids: Set<UInt32>) {
+        guard !ids.isEmpty else { return }   // the window list couldn't be read
+        let existing = Set(ids.map { String($0) })
         kinds = kinds.filter { existing.contains($0.key) }
         kindMisses = kindMisses.filter { existing.contains($0.key) }
         kindAbsences = kindAbsences.filter { existing.contains($0.key) }

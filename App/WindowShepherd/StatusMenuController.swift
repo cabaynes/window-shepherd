@@ -25,6 +25,7 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
     /// Windows were left behind: blink red until the menu opens.
     private var flashTimer: Timer?
     private var flashRed = false
+    private var flashing = false
     /// Just built by popUpAtMouse to measure it: the delegate needn't build it again.
     private var builtForPopUp = false
 
@@ -37,6 +38,14 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
         item.menu = menu
         setBusy(false)
         updateTooltip()
+        // Reduce motion switched while flashing: switch between blinking and steady red now.
+        NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.accessibilityDisplayOptionsDidChangeNotification, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self, self.flashing else { return }
+                self.setFlashing(true)
+            }
+        }
     }
 
     func setBusy(_ busy: Bool) {
@@ -47,6 +56,7 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
     /// Flashing: red and plain alternate every half second (steady red with
     /// Reduce motion on). While busy, the steady busy red wins.
     func setFlashing(_ on: Bool) {
+        flashing = on
         flashTimer?.invalidate()
         flashTimer = nil
         flashRed = on

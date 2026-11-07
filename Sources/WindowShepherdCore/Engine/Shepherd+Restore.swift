@@ -41,9 +41,15 @@ extension Shepherd {
             Log.info("screen setup is now \(Screens.setupLabel(screens)); \(book.layouts[key]?.count ?? 0) windows remembered for it, restoring in \(Int(first.rounded()))s")
             let before = Set(book.lastSetup?.split(separator: "+").map(String.init) ?? [])
             book.setupChanged(to: key, now: nowSeconds)   // freezes the old combination, or rolls it back
+            homelessAt = [:]
+            changedAtDate = Date()
             if !Set(screens.map(\.uuid)).isSubset(of: before) {   // a screen was added
                 let home = book.layouts[key] ?? [:], frozen = book.frozen[key]?.layout ?? [:]
-                book.homeless = Set(system.visibleWindows().map { String($0.id) }.filter { home[$0] == nil && frozen[$0] == nil })
+                let shown = system.visibleWindows()
+                book.homeless = Set(shown.map { String($0.id) }.filter { home[$0] == nil && frozen[$0] == nil })
+                for w in shown where book.homeless.contains(String(w.id)) {
+                    homelessAt[String(w.id)] = Geometry.whereIs(w.frame, in: screens)
+                }
             }
             lastChange = (key, nowSeconds)
             frozenStore.save(FrozenState(copies: book.frozen, lastChangeKey: key, lastChangeAt: nowSeconds))
@@ -53,7 +59,7 @@ extension Shepherd {
             draggedNew = []                                   // and where it puts them isn't yours
             setFlashing(false)
             resumeRestore = false   // that restore was for the old setup
-            revertPending = false   // and so was a Revert still waiting to run
+            revertPending = nil     // and so was a Revert still waiting to run
             if let job = runner.current {   // it was moving/restoring for the old setup: stop it
                 Log.info("stopped a \(job.kind.rawValue) that was running for the previous screen setup")
                 runner.stopCurrent(reportAs: nil)
@@ -95,8 +101,16 @@ extension Shepherd {
         }
         let visible = system.visibleWindows()
         book.visibleAtLastTick = Set(visible.map { String($0.id) })
+        // The full window list (every Space, minimized) is a costly read: at most once a tick.
+        var allIDs: Set<UInt32>?
+        func existingNow() -> Set<UInt32> {
+            if let allIDs { return allIDs }
+            let ids = system.allWindowIDs()
+            allIDs = ids
+            return ids
+        }
         if !book.leftBehind.isEmpty {
-            book.resolve(windows: visible, screens: screens, existing: system.allWindowIDs())
+            book.resolve(windows: visible, screens: screens, existing: existingNow())
         }
         if flashing && book.unresolvedVisible(visible) == 0 { setFlashing(false) }
         checkLandings(visible: visible, screens: screens, key: key)
@@ -112,9 +126,9 @@ extension Shepherd {
         // A window still on its way to its spot isn't in it yet.
         spots.touch(key: key, visible: book.visibleAtLastTick.subtracting(placing?.pending ?? []), now: nowSeconds)
         if snap.changed || Date().timeIntervalSince1970 - store.lastSaved > 600 {
-            let existing = system.allWindowIDs()
-            book.forgetClosed(existing: existing, running: Set(system.runningApps().keys))
-            forgetKinds()
+            let existing = existingNow()
+            forgetClosed(existing: existing, running: Set(system.runningApps().keys))
+            forgetKinds(existing: existing)
             forgetSpots(existing: existing)
             forgetNewWindows(existing: existing)
             store.save(book.layouts)
@@ -173,8 +187,15 @@ extension Shepherd {
         let unit = undocked.size.unit
         var n = 0
         defer { if n > 0 { Log.info("\(n) window\(n == 1 ? "" : "s") opened while undocked → \(target.name) (\(undocked.size.rawValue))") } }
+        let dragged = system.lastMouseDrag().map { $0 > changedAtDate } == true
         for w in windows where book.homeless.contains(String(w.id)) && !book.restoredIds.contains(String(w.id))
             && plan?[w.pid]?[w.id] == nil {
+            // Dragged since the screen change, before this pass: yours, left where you put it.
+            if dragged, let was = homelessAt[String(w.id)], !Geometry.sameSpot(Geometry.whereIs(w.frame, in: screens), was) {
+                book.homeless.remove(String(w.id))
+                book.restoredIds.insert(String(w.id))
+                continue
+            }
             var t = RestoreTarget(id: String(w.id), screenUUID: target.uuid, unit: unit ?? UnitRect(x: 0, y: 0, w: 1, h: 1),
                                   from: Geometry.whereIs(w.frame, in: screens))
             t.keepSize = unit == nil
@@ -224,11 +245,11 @@ extension Shepherd {
             schedulePass(after: restoreTiming.busyRecheck)
             return
         }
-        let recordsSpots = recordsSpots || revertPending
+        let recordsSpots = recordsSpots || revertPending != nil
         let running = Set(system.runningApps().keys)
         let existing = system.allWindowIDs()
-        if book.forgetClosed(existing: existing, running: running) { store.save(book.layouts) }
-        forgetKinds()
+        if forgetClosed(existing: existing, running: running) { store.save(book.layouts) }
+        forgetKinds(existing: existing)
         forgetSpots(existing: existing)
         forgetNewWindows(existing: existing)
         let visibleNow = system.visibleWindows()
@@ -240,15 +261,15 @@ extension Shepherd {
         addHomeless(to: &plan, windows: visibleNow, screens: screens)
         guard let plan, !plan.isEmpty else {
             book.settled = true
-            if recordsSpots { revertPending = false }
+            if recordsSpots { revertPending = nil }
             offerRetry(.restore, missed: [:]) { _ in }   // nothing left to put back
             return
         }
         let main = system.mainScreen()
         let tally = Tally<RestoreTarget>()
         let apps = Dictionary(visibleNow.map { ($0.id, $0.app) }, uniquingKeysWith: { a, _ in a })
-        // Patience runs from the screen change, so a resumed or late pass gets only what's left.
-        let remaining = patience ?? (book.changedAt + restoreTiming.patience - nowSeconds)
+        // Patience runs from the screen change (or the Revert press), so a resumed or late pass gets only what's left.
+        let remaining = patience ?? ((revertPending ?? (book.changedAt + restoreTiming.patience)) - nowSeconds)
         let patientUntil = remaining > 0 ? Date().addingTimeInterval(remaining) : nil
         // A patient job does the later passes' work itself: drop them, or they'd run after it, past the budget.
         if patientUntil != nil { cancelRestores() }
@@ -301,7 +322,7 @@ extension Shepherd {
             if problem == .interrupted && self.book.lastSetup == key {
                 self.resumeRestore = true           // your move came first; the restore picks up after it
             } else if recordsSpots {
-                self.revertPending = false          // the Revert ran
+                self.revertPending = nil            // the Revert ran
             }
             let visible = self.system.visibleWindows()
             self.book.restoreFinished(plan: plan, visible: Set(visible.map { String($0.id) }))

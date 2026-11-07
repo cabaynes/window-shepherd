@@ -78,6 +78,7 @@ final class FakeWindowSystem: WindowSystem {
     var offSpace: Set<UInt32> = []
     var mouseUsed: Date?                         // the last left-button press or drag
     var mouseDragged: Date?                      // the last left-button drag
+    var allIDsReads = 0                          // full window-list reads (.optionAll: costly)
     var enhancedUI: Set<pid_t> = []              // apps with AXEnhancedUserInterface on (Chrome under assistive tools)
     var enhancedOffCount: [pid_t: Int] = [:]     // times it was switched off
     var noFrame: Set<UInt32> = []                // frame() fails for these (the app didn't answer)               // exist (another Space, minimized) but aren't on screen
@@ -103,7 +104,7 @@ final class FakeWindowSystem: WindowSystem {
             return windows.map { w in staleFrames[w.id].map { CGWindow(id: w.id, pid: w.pid, app: w.app, title: w.title, frame: $0) } ?? w }
         }
     }
-    func allWindowIDs() -> Set<UInt32> { locked { Set(windows.map(\.id)).union(offSpace) } }
+    func allWindowIDs() -> Set<UInt32> { locked { allIDsReads += 1; return Set(windows.map(\.id)).union(offSpace) } }
     func screens() -> [ScreenInfo] { locked { allScreens } }
     func mainScreen() -> ScreenInfo? { locked { main ?? allScreens.first } }
     func frontmostPID() -> pid_t? { locked { front } }

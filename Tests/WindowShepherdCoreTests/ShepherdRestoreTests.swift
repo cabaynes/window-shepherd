@@ -139,6 +139,18 @@ final class ShepherdRestoreTests: XCTestCase {
         XCTAssertEqual(again.book.frozen, s.book.frozen)
     }
 
+    /// A closed window pruned from a frozen copy is gone from the saved file too, not only in memory.
+    func testFrozenCopyPrunedOfAClosedWindowIsSaved() async {
+        let s = await rememberedThenUnplugged()
+        let dual = Screens.setupKey([lap, dell])
+        sys.locked { sys.windows.removeAll { $0.id == 2 } }   // you close window 2 (its app still runs)
+        move(1, to: rect(70))                                  // something changes, so the tick saves
+        s.tick(); s.tick()
+        XCTAssertNil(s.book.frozen[dual]?.layout["2"], "pruned in memory")
+        s.frozenStore.flush()
+        XCTAssertNil(s.frozenStore.load().copies[dual]?.layout["2"], "and on disk")
+    }
+
     func testRestoreLeavesUnmovedVisibleWindowsLeftBehind() async {
         let s = await rememberedThenUnplugged()
         sys.failSet = [1]

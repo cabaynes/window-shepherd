@@ -75,6 +75,28 @@ final class UndockedTests: XCTestCase {
         XCTAssertEqual(sys.frameOf(1)?.minX ?? 0, 1100, accuracy: 0.5, "remembered windows still go home")
     }
 
+    /// You drag a window opened while undocked right after plugging in, before the restore
+    /// runs: it's yours, and the undocked default leaves it there.
+    func testDraggedRightAfterPlugInIsLeft() async {
+        sys.addApp(10, "Safari", windows: [(1, rect(1100))])
+        let s = make()
+        s.tick()
+        sys.allScreens = [lap]
+        move(1, to: rect(50))
+        s.screensChanged()
+        await waitUntil { !s.isBusy }
+        sys.addApp(30, "Notes", windows: [(7, rect(40))])
+        s.tick(); s.tick()
+        sys.allScreens = [lap, dell]
+        s.tick()                                               // the plug-in; the restore runs shortly
+        sys.locked { sys.mouseUsed = Date(); sys.mouseDragged = sys.mouseUsed }
+        move(7, to: rect(1500))                                // you drag Notes onto the Dell first
+        await waitUntil(4) { !s.isBusy && s.pendingPasses == 0 }
+        XCTAssertEqual(sys.frameOf(7), rect(1500))
+        XCTAssertEqual(sys.setCount(7), 0)
+        XCTAssertEqual(sys.frameOf(1)?.minX ?? 0, 1100, accuracy: 0.5, "remembered windows still go home")
+    }
+
     func testUndockedOffLeavesThem() async {
         _ = await openedWhileUndocked { $0.undocked.enabled = false }
         XCTAssertEqual(sys.frameOf(7), rect(40))
