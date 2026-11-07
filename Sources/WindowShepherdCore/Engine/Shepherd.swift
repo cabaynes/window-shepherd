@@ -180,6 +180,7 @@ public final class Shepherd {
         if !sel.retry { retryOffer = nil }   // a new move replaces the old offer
 
         var inFullScreen = false   // a snap's window was in full screen: say that instead
+        var fullScreenCount = 0    // a bulk move's windows left alone in full screen
         func finish(_ problem: JobProblem?) {
             defer { if problem != .interrupted { then?() } }
             tally.settle()
@@ -189,8 +190,12 @@ public final class Shepherd {
             if inFullScreen {
                 alert("That window is in full screen, so Window Shepherd leaves it where it is")
             } else if !sel.quiet || !tally.skipped.isEmpty || problem != nil || total == 0 || refused > 0 {
-                alert(reportText("Moved \(total) window\(total == 1 ? "" : "s") → \(label)",
-                                 skipped: tally.skipped, hasMissed: !tally.missed.isEmpty, problem: problem, refused: refused))
+                var msg = reportText("Moved \(total) window\(total == 1 ? "" : "s") → \(label)",
+                                     skipped: tally.skipped, hasMissed: !tally.missed.isEmpty, problem: problem, refused: refused)
+                if fullScreenCount > 0 {
+                    msg += "\n(\(fullScreenCount) in full screen, left as \(fullScreenCount == 1 ? "it is" : "they are"))"
+                }
+                alert(msg)
             }
             if let pid = sel.pid, sel.winId == nil, problem != .interrupted {   // whole app: bring it forward
                 let system = self.system
@@ -281,7 +286,8 @@ public final class Shepherd {
                         landing.expect(.init(pid: pid, id: id, wanted: r, resizable: win.isResizable, at: clock(),
                                              retry: .move(placer, label)))
                     },
-                    onMoved: { [weak self] id, _ in self?.book.restoredIds.insert(String(id)) })
+                    onMoved: { [weak self] id, _ in self?.book.restoredIds.insert(String(id)) },
+                    onFullScreen: { _ in fullScreenCount += 1 })
         }
         let count = byPid.values.reduce(0) { $0 + $1.count }
         runner.run(.move, steps: steps, deadline: max(deadlineFor(windowCount: count), timing.movePatience + 10), done: finish)

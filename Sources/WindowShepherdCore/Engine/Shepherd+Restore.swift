@@ -191,7 +191,8 @@ extension Shepherd {
         for w in windows where book.homeless.contains(String(w.id)) && !book.restoredIds.contains(String(w.id))
             && plan?[w.pid]?[w.id] == nil {
             // Dragged since the screen change, before this pass: yours, left where you put it.
-            if dragged, let was = homelessAt[String(w.id)], !Geometry.sameSpot(Geometry.whereIs(w.frame, in: screens), was) {
+            // Only a window seen on a screen at the change can be said to have moved since.
+            if dragged, let was = homelessAt[String(w.id)] ?? nil, !Geometry.sameSpot(Geometry.whereIs(w.frame, in: screens), was) {
                 book.homeless.remove(String(w.id))
                 book.restoredIds.insert(String(w.id))
                 continue
@@ -245,6 +246,8 @@ extension Shepherd {
             schedulePass(after: restoreTiming.busyRecheck)
             return
         }
+        // A Revert whose patience is over has ended, even if its job never reported back (stale).
+        if let until = revertPending, nowSeconds > until { revertPending = nil }
         let recordsSpots = recordsSpots || revertPending != nil
         let running = Set(system.runningApps().keys)
         let existing = system.allWindowIDs()

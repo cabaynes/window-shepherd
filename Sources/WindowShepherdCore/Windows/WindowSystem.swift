@@ -11,8 +11,8 @@ public protocol WindowHandle: AnyObject {
     /// panel); nil when the app doesn't say.
     var isStandard: Bool? { get }
     /// Whether the window has the green full-screen button (Finder's Get Info
-    /// panel is standard but has none).
-    var hasFullScreenButton: Bool { get }
+    /// panel is standard but has none); nil when the app didn't answer.
+    var hasFullScreenButton: Bool? { get }
     /// In native full screen (the green button): it has its own Space; Window Shepherd leaves it be.
     var isFullScreen: Bool { get }
     /// The title the app reports (needs only Accessibility, unlike the window list's titles).

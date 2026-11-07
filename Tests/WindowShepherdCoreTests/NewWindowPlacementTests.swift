@@ -562,6 +562,24 @@ final class NewWindowPlacementTests: XCTestCase {
         XCTAssertEqual(finderSpots(s), [])
     }
 
+    /// Finder busy when asked about the button: asked again, not taken for a panel for good.
+    func testFinderWindowWithAnUnreadableButtonIsAskedAgain() async {
+        let s = make()
+        seedFreeSpot(s, ninety, on: dell, bundle: Self.finder)
+        sys.unreadableButton = [5]
+        addApp(20, "Finder", windows: [(5, rect(100))], bundle: Self.finder)
+        s.tick()
+        await waitUntil { s.kindsInFlight.isEmpty }
+        XCTAssertNil(s.isMainWindow("5"), "not known yet")
+        sys.locked { sys.unreadableButton = [] }   // Finder answers next time
+        s.tick()
+        await waitUntil { s.kindsInFlight.isEmpty && s.isMainWindow("5") != nil }
+        s.tick()
+        await waitUntil { !s.isBusy }
+        XCTAssertEqual(s.isMainWindow("5"), true)
+        XCTAssertEqual(sys.frameOf(5), dell90)
+    }
+
     /// A real Finder window (it has the green button) is still placed.
     func testFinderWindowIsStillPlaced() async {
         let s = make()

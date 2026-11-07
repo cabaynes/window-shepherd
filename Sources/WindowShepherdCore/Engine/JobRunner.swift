@@ -27,10 +27,17 @@ public final class JobContext {
 
     public func insert(_ s: @escaping JobStep, at i: Int) { steps.insert(s, at: min(i, steps.count)) }
     public func append(_ s: @escaping JobStep) { steps.append(s) }
-    /// Something that must be undone even if the job is cut short.
-    public func onEnd(_ f: @escaping @MainActor () -> Void) { endings.append(f) }
+    /// The job is over (a step may still be finishing an await it began before).
+    public private(set) var ended = false
+
+    /// Something that must be undone even if the job is cut short. Added after the job
+    /// ended (a step that was mid-await), it runs at once.
+    public func onEnd(_ f: @escaping @MainActor () -> Void) {
+        if ended { f() } else { endings.append(f) }
+    }
 
     func end() {
+        ended = true
         let e = endings
         endings = []
         for f in e { f() }

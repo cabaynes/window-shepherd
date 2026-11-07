@@ -224,6 +224,24 @@ final class AppSpotRecordingTests: XCTestCase {
         XCTAssertEqual(sys.frameOf(1)?.minX ?? 0, 1100, accuracy: 0.5, "retried and reverted")
     }
 
+    /// A Revert whose patience is long over (its job went stale) no longer makes every later
+    /// restore pass record spots.
+    func testOldRevertMarkExpires() async {
+        addApp(10, "Safari", windows: [(1, rect(1100))])
+        let s = make()
+        s.tick()
+        await waitUntil { s.isMainWindow("1") != nil }
+        s.tick(); s.tick()
+        XCTAssertNotNil(s.book.layouts[key]?["1"])
+        move(1, to: rect(1500))                                 // moved without the mouse
+        s.revertPending = clock.timeIntervalSince1970 - 10      // a Revert that never finished, long ago
+        s.restore()
+        await waitUntil { !s.isBusy }
+        XCTAssertEqual(sys.frameOf(1)?.minX ?? 0, 1100, accuracy: 0.5, "a plain restore put it back")
+        XCTAssertTrue(spots(s, "Safari").isEmpty, "and recorded no spot: the old Revert is over")
+        XCTAssertNil(s.revertPending)
+    }
+
     /// As in UndockedTests: Safari remembered on the Dell; unplug; Notes window 7
     /// opens on the built-in screen; plug the Dell back in.
     func testUndockedDefaultRecordsSpot() async {

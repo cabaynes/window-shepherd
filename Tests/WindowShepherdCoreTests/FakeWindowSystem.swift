@@ -15,7 +15,9 @@ final class FakeWindowSystem: WindowSystem {
         var isStandard: Bool? { sys.locked { sys.unreadableKind.contains(id) ? nil : !sys.nonStandard.contains(id) } }
         var title: String? { sys.locked { sys.axTitles[id] } }
         var isFullScreen: Bool { sys.locked { sys.fullScreen.contains(id) } }
-        var hasFullScreenButton: Bool { sys.locked { !sys.noFullScreenButton.contains(id) } }
+        var hasFullScreenButton: Bool? {
+            sys.locked { sys.unreadableButton.contains(id) ? nil : !sys.noFullScreenButton.contains(id) }
+        }
         var isResizable: Bool { sys.locked { !sys.fixedSize.contains(id) } }
         func setFrame(_ r: CGRect) throws {
             // As AXWindow does: an app with enhanced UI on has it switched off for the move, then on.
@@ -60,6 +62,7 @@ final class FakeWindowSystem: WindowSystem {
     var launched: [pid_t: Date] = [:]
     var nonStandard: Set<UInt32> = []            // subrole isn't standard (dialogs, palettes)
     var unreadableKind: Set<UInt32> = []         // the subrole can't be read (isStandard nil)
+    var unreadableButton: Set<UInt32> = []        // the app didn't answer when asked about the button
     var noFullScreenButton: Set<UInt32> = []     // no green full-screen button (Finder's Get Info, Photoshop documents)
     var staleFrameOnce: Set<UInt32> = []         // the next window list after a setFrame still shows the old frame
     var staleFrames: [UInt32: CGRect] = [:]

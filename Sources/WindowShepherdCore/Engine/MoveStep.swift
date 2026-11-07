@@ -132,7 +132,7 @@ public func appStep<V>(pid: pid_t, wanted: [UInt32: V], system: WindowSystem, wo
         // Enhanced UI off once for all its windows, not per window (each switch back on makes
         // Chrome rebuild its accessibility tree); back on after them, or when the job ends early.
         var enhancedBack: @MainActor () -> Void = {}
-        if !found.isEmpty, await worker.run({ system.enhancedUIOff(pid: pid) }) {
+        if !found.isEmpty, !ctx.ended, await worker.run({ system.enhancedUIOff(pid: pid) }) {
             let back = Flag()
             enhancedBack = {
                 guard !back.on else { return }

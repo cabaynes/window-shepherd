@@ -97,6 +97,27 @@ final class UndockedTests: XCTestCase {
         XCTAssertEqual(sys.frameOf(1)?.minX ?? 0, 1100, accuracy: 0.5, "remembered windows still go home")
     }
 
+    /// A window off every screen at the plug-in that macOS then brings on screen isn't "yours"
+    /// just because the mouse dragged something (a text selection) meanwhile.
+    func testOffScreenAtPlugInStillGetsTheDefault() async {
+        sys.addApp(10, "Safari", windows: [(1, rect(1100))])
+        let s = make()
+        s.tick()
+        sys.allScreens = [lap]
+        move(1, to: rect(50))
+        s.screensChanged()
+        await waitUntil { !s.isBusy }
+        sys.addApp(30, "Notes", windows: [(7, rect(40))])
+        s.tick(); s.tick()
+        move(7, to: CGRect(x: 9000, y: 9000, width: 400, height: 300))   // off every screen at the change
+        sys.allScreens = [lap, dell]
+        s.tick()
+        sys.locked { sys.mouseUsed = Date(); sys.mouseDragged = sys.mouseUsed }   // you select some text
+        move(7, to: rect(40))                                                     // macOS brings Notes back
+        await waitUntil(4) { !s.isBusy && s.pendingPasses == 0 }
+        XCTAssertEqual(sys.frameOf(7), Geometry.place(UnitRect(x: 0.05, y: 0.05, w: 0.9, h: 0.9), in: dell.frame))
+    }
+
     func testUndockedOffLeavesThem() async {
         _ = await openedWhileUndocked { $0.undocked.enabled = false }
         XCTAssertEqual(sys.frameOf(7), rect(40))

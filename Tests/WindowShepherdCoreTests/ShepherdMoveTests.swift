@@ -363,6 +363,7 @@ final class ShepherdMoveTests: XCTestCase {
         XCTAssertEqual(sys.setCount(1), 1)
         XCTAssertEqual(sys.setCount(2), 0, "full screen: left alone")
         XCTAssertNil(s.retryOffer)
+        XCTAssertEqual(alerts.last?.contains("1 in full screen, left as it is"), true, "\(alerts)")
     }
 
     /// A keyboard snap on a full-screen window does nothing and says why.
@@ -375,5 +376,21 @@ final class ShepherdMoveTests: XCTestCase {
         await waitUntil { !self.alerts.isEmpty && s.snapInFlight.isEmpty }
         XCTAssertEqual(sys.setCount(1), 0)
         XCTAssertEqual(alerts.first?.contains("full screen"), true, "\(alerts)")
+    }
+
+    /// The move is interrupted while it's still waiting for Chrome's window list: the enhanced
+    /// UI is never left switched off (the step goes on after the job has ended).
+    func testEnhancedUIStaysOnWhenInterruptedDuringTheListing() async {
+        sys.addApp(10, "Google Chrome", windows: [(1, rect(100)), (2, rect(150))])
+        sys.addApp(20, "Finder", windows: [(4, rect(300))])
+        sys.enhancedUI = [10]
+        sys.listBehaviour[10] = .sleep(0.3)               // Chrome is slow to list its windows
+        let s = make()
+        s.apply(Selection(pid: 10), placer: .fraction(0.9, on: .fixed(uuid: dell.uuid)), label: "DELL (90%)")
+        try? await Task.sleep(nanoseconds: 100_000_000)  // the step is waiting on the listing…
+        s.apply(Selection(pid: 20), placer: .fraction(0.9, on: .own), label: "90%")   // …when a new move interrupts
+        await waitUntil { !s.isBusy }
+        try? await Task.sleep(nanoseconds: 500_000_000)  // the old step finishes its wait
+        XCTAssertTrue(sys.locked { sys.enhancedUI.contains(10) }, "never left off")
     }
 }
