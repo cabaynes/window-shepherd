@@ -54,6 +54,30 @@ final class FinalReviewFixTests: XCTestCase {
         XCTAssertEqual(sys.setCount(2), 0, "the restore job must not move a window you just placed")
     }
 
+    /// WS-229: a keyboard snap that lands while a restore job runs, at an app slow to answer,
+    /// isn't undone by that job (the snap has no mouse use, and it isn't done yet when the job
+    /// reaches its window).
+    func testSnapLandingDuringRestoreIsNotUndone() async {
+        sys.addApp(10, "Safari", windows: [(1, rect(1100))])
+        sys.addApp(20, "Finder", windows: [(3, rect(1300))])
+        let s = make()
+        s.tick()
+        sys.allScreens = [lap]
+        move(1, to: rect(50)); move(3, to: rect(80))
+        s.screensChanged()
+        await waitUntil { !s.isBusy }
+        sys.setDelay = [1: 0.3]                         // Safari first, and slow: Finder's turn comes later
+        sys.replyDelay = [3: 0.6]                       // Finder moves its window at once but answers late
+        sys.allScreens = [lap, dell]
+        s.tick()
+        await waitUntil { self.sys.setCount(1) == 1 }   // the job is on Safari…
+        s.apply(Selection(pid: 20, winId: 3, quiet: true), placer: .fraction(0.9, on: .own), label: "Almost Maximize")
+        await waitUntil { self.sys.frameOf(3) != self.rect(80) }   // …when your snap of Finder's window lands
+        let snapped = sys.frameOf(3)
+        await waitUntil { !s.isBusy && s.snapInFlight.isEmpty }
+        XCTAssertEqual(sys.frameOf(3), snapped, "the restore job put back a window you just snapped")
+    }
+
     /// I1: a window that was on another Space during the restore is put back
     /// when it shows up, and its home isn't overwritten with the dumped spot.
     func testOffscreenWindowIsRestoredWhenItReappears() async {

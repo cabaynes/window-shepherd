@@ -324,6 +324,7 @@ extension Shepherd {
     /// since the plan was made, so it's yours now and stays where it is.
     func placedByYou(_ id: UInt32, from: Spot?, plannedAt: Date, screens: [ScreenInfo]) -> Bool {
         if book.restoredIds.contains(String(id)) { return true }   // a hotkey or menu move while the job ran
+        if snapping.values.contains(where: { $0.contains(id) }) { return true }   // a keyboard snap is moving it
         // Dragged since the plan was made (no snapshot runs during a job): yours now.
         // Moved with no mouse use since then: macOS or the app moved it (after a wake or
         // an unplug they do, for a while), so it still goes (live 2026-10-29).

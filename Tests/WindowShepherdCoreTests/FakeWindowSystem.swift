@@ -31,6 +31,8 @@ final class FakeWindowSystem: WindowSystem {
                     sys.windows[i] = CGWindow(id: w.id, pid: w.pid, app: w.app, title: w.title, frame: f)
                 }
             }
+            let reply = sys.locked { sys.replyDelay[id] ?? 0 }   // moved at once, but the app answers late
+            if reply > 0 { Thread.sleep(forTimeInterval: reply) }
         }
     }
 
@@ -59,6 +61,7 @@ final class FakeWindowSystem: WindowSystem {
     var focused: [pid_t: UInt32] = [:]
     var unreadableIDs: Set<UInt32> = []          // _AXUIElementGetWindow fails for these
     var setDelay: [UInt32: TimeInterval] = [:]
+    var replyDelay: [UInt32: TimeInterval] = [:]  // setFrame moves the window, then returns this much later
     var failSet: Set<UInt32> = []                // setFrame throws for these
     var framesSet: [(UInt32, CGRect)] = []
     var activated: [pid_t] = []

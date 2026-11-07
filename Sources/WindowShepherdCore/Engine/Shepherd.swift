@@ -106,6 +106,9 @@ public final class Shepherd {
     /// Apps with a keyboard/menu snap in flight, and the latest press waiting behind it.
     var snapInFlight = Set<pid_t>()
     var snapPending: [pid_t: @MainActor () async -> Void] = [:]
+    /// Per app, the windows its in-flight or waiting snaps were pressed on: yours from the
+    /// press, since the app can move a window well before it answers.
+    var snapping: [pid_t: Set<UInt32>] = [:]
 
     /// Where windows opened while a screen was unplugged go when it's back.
     public var undocked = UndockedWindows.defaults
@@ -199,6 +202,7 @@ public final class Shepherd {
             // Use the app's focused window.
             let cgFrame = system.visibleWindows().first { $0.id == winId }?.frame
             let system = self.system
+            if winId != 0 { snapping[pid, default: []].insert(winId) }
             runSnap(pid) { [weak self] in
                 let moved: UInt32?? = await AXWorker.detached {
                     let wins = (try? system.appWindows(pid: pid)) ?? []
@@ -262,7 +266,7 @@ public final class Shepherd {
         Task { @MainActor in
             await work()
             self.snapInFlight.remove(pid)
-            if let next = self.snapPending.removeValue(forKey: pid) { self.runSnap(pid, next) }
+            if let next = self.snapPending.removeValue(forKey: pid) { self.runSnap(pid, next) } else { self.snapping[pid] = nil }
         }
     }
 
