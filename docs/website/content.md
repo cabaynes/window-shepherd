@@ -191,6 +191,7 @@ Credit line in the footer: "The halves, full screen and center keys follow the S
 > **Free and open.** No trial, no account. Anyone can read how it's made on GitHub.
 
 Measure before claiming any CPU or battery figure: idle CPU in Activity Monitor over a few minutes. **[verify at release]** If it's tiny, add it: "On my MacBook it uses about X% CPU when idle."
+First measurement, 2026-11-07 (Debug build, Charles's MacBook Air, docked, about 35 windows remembered, 65 s with `top` every 5 s): **0.0–0.1% CPU, 11 MB memory (26 MB resident), 3 threads.** Repeat on the release build before quoting it; a release build should be no heavier.
 
 ---
 
@@ -379,7 +380,7 @@ Never claim to be the only one.
 6. **Does it restore windows after a restart, or after an app restarts?** **[verify at release]** Draft answer if it holds: "Yes. It remembers where each app's windows go, so after a restart or an update relaunch they go back to their usual spots. With several browser windows, the pages may come back in a different one of them."
 7. **Do I have to uninstall Rectangle?** No. They work side by side, sharing only a couple of shortcuts, and Window Shepherd steps aside on those while Rectangle runs.
 8. **Why does it need Accessibility permission?** Use the "How to start" reassurance text (4.4).
-9. **Will it slow my Mac down?** I built it so a frozen app can't hold it up, and its only background work is a light check every 2 seconds. (Add the idle CPU figure once measured.)
+9. **Will it slow my Mac down?** I built it so a frozen app can't hold it up, and its only background work is a light check every 2 seconds. (Idle figure, first measured 2026-11-07: about 0.1% CPU and 11 MB of memory; confirm on the release build before adding it.)
 10. **Can I move just some of my Chrome windows?** Not as a group. It moves one window, or every window of an app. Move the others one at a time with a shortcut.
 11. **What about other desktops (Spaces), full screen apps, Stage Manager or Zoom?** Moves work on the windows you can see. Windows on other desktops are left where they are, and Zoom's floating controls are never moved. Windows in full screen are left alone. Stage Manager hasn't been tested yet. **[verify at release: full screen live]**
 12. **Does it work with two identical monitors, docks or three monitors?** **[verify at release]** for each before answering yes. The honest answer today: "Screens are numbered 1 for the laptop, then left to right. I've only tested it with one monitor so far."
