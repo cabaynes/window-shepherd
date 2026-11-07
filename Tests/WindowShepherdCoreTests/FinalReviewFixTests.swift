@@ -78,6 +78,30 @@ final class FinalReviewFixTests: XCTestCase {
         XCTAssertEqual(sys.frameOf(3), snapped, "the restore job put back a window you just snapped")
     }
 
+    /// The same, when the snap moves the window with keyboard focus rather than the front one
+    /// in the window list (after ⌘` an app focuses a window without raising it).
+    func testSnapOfTheFocusedWindowDuringRestoreIsNotUndone() async {
+        sys.addApp(10, "Safari", windows: [(1, rect(1100))])
+        sys.addApp(20, "Finder", windows: [(5, rect(1700)), (3, rect(1300))])
+        let s = make()
+        s.tick()
+        sys.allScreens = [lap]
+        move(1, to: rect(50)); move(3, to: rect(80)); move(5, to: rect(90))
+        s.screensChanged()
+        await waitUntil { !s.isBusy }
+        sys.setDelay = [1: 0.3]
+        sys.replyDelay = [3: 0.6]
+        sys.locked { sys.focused[20] = 3 }              // Finder's focused window is 3; 5 is in front
+        sys.allScreens = [lap, dell]
+        s.tick()
+        await waitUntil { self.sys.setCount(1) == 1 }
+        s.apply(Selection(pid: 20, winId: 5, quiet: true), placer: .fraction(0.9, on: .own), label: "Almost Maximize")
+        await waitUntil { self.sys.frameOf(3) != self.rect(80) }
+        let snapped = sys.frameOf(3)
+        await waitUntil { !s.isBusy && s.snapInFlight.isEmpty }
+        XCTAssertEqual(sys.frameOf(3), snapped, "the restore job put back the window you just snapped")
+    }
+
     /// I1: a window that was on another Space during the restore is put back
     /// when it shows up, and its home isn't overwritten with the dumped spot.
     func testOffscreenWindowIsRestoredWhenItReappears() async {

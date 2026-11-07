@@ -118,9 +118,10 @@ public final class Shepherd {
     /// Apps with a keyboard/menu snap in flight, and the latest press waiting behind it.
     var snapInFlight = Set<pid_t>()
     var snapPending: [pid_t: @MainActor () async -> Void] = [:]
-    /// Per app, the windows its in-flight or waiting snaps were pressed on: yours from the
-    /// press, since the app can move a window well before it answers.
-    var snapping: [pid_t: Set<UInt32>] = [:]
+    /// Per app, the windows its in-flight or waiting snaps were pressed on, and the one each
+    /// snap actually moves (marked by the worker just before the move): yours from then on,
+    /// since the app can move a window well before it answers.
+    let snapping = SnapMarks()
 
     /// Where windows opened while a screen was unplugged go when it's back.
     public var undocked = UndockedWindows.defaults
@@ -224,7 +225,8 @@ public final class Shepherd {
             // Use the app's focused window.
             let cgFrame = system.visibleWindows().first { $0.id == winId }?.frame
             let system = self.system
-            if winId != 0 { snapping[pid, default: []].insert(winId) }
+            if winId != 0 { snapping.insert(winId, pid: pid) }
+            let marks = snapping
             runSnap(pid) { [weak self] in
                 let outcome: SnapOutcome = await AXWorker.detached {
                     let wins = (try? system.appWindows(pid: pid)) ?? []
@@ -237,6 +239,7 @@ public final class Shepherd {
                           let frame = target.frame() ?? cgFrame else { return .noAnswer }
                     if target.isFullScreen { return .fullScreen }
                     guard let r = placer.frame(for: frame, screens: screens, main: main) else { return .nothingToDo }
+                    if let id = target.windowID, id != 0 { marks.insert(id, pid: pid) }   // the focused one may not be winId
                     guard (try? target.setFrame(r)) != nil else { return .refused }
                     let id = target.windowID
                     if let id, id != 0 {
@@ -293,6 +296,15 @@ public final class Shepherd {
         runner.run(.move, steps: steps, deadline: max(deadlineFor(windowCount: count), timing.movePatience + 10), done: finish)
     }
 
+    /// Windows keyboard snaps are moving, by app; written from the snap's worker, read on main.
+    final class SnapMarks: @unchecked Sendable {
+        private let lock = NSLock()
+        private var ids: [pid_t: Set<UInt32>] = [:]
+        func insert(_ id: UInt32, pid: pid_t) { lock.lock(); ids[pid, default: []].insert(id); lock.unlock() }
+        func clear(pid: pid_t) { lock.lock(); ids[pid] = nil; lock.unlock() }
+        func contains(_ id: UInt32) -> Bool { lock.lock(); defer { lock.unlock() }; return ids.values.contains { $0.contains(id) } }
+    }
+
     /// How a keyboard snap went: moved (its window id, if readable), the app didn't answer
     /// (no window or frame read), it refused the move, or the placer had nothing to do.
     enum SnapOutcome { case moved(UInt32?), noAnswer, refused, nothingToDo, fullScreen }
@@ -307,7 +319,7 @@ public final class Shepherd {
         Task { @MainActor in
             await work()
             self.snapInFlight.remove(pid)
-            if let next = self.snapPending.removeValue(forKey: pid) { self.runSnap(pid, next) } else { self.snapping[pid] = nil }
+            if let next = self.snapPending.removeValue(forKey: pid) { self.runSnap(pid, next) } else { self.snapping.clear(pid: pid) }
         }
     }
 

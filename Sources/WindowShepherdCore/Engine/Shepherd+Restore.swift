@@ -115,7 +115,7 @@ extension Shepherd {
         if flashing && book.unresolvedVisible(visible) == 0 { setFlashing(false) }
         checkLandings(visible: visible, screens: screens, key: key)
         requestKinds(visible)
-        placeNewWindows(visible: visible, screens: screens, key: key)
+        placeNewWindows(visible: visible, screens: screens, key: key, existing: existingNow)
         // A window whose move isn't checked yet isn't recorded where it is.
         let unchecked = landing.pending()
         let snap = book.snapshot(key: key, windows: unchecked.isEmpty ? visible : visible.filter { !unchecked.contains($0.id) },
@@ -362,7 +362,7 @@ extension Shepherd {
     func placedByYou(_ id: UInt32, from: Spot?, plannedAt: Date, screens: [ScreenInfo],
                      then: String = "putting it back") -> Bool {
         if book.restoredIds.contains(String(id)) { return true }   // a hotkey or menu move while the job ran
-        if snapping.values.contains(where: { $0.contains(id) }) { return true }   // a keyboard snap is moving it
+        if snapping.contains(id) { return true }   // a keyboard snap is moving it
         // Dragged since the plan was made (no snapshot runs during a job): yours now.
         // Moved with no mouse use since then: macOS or the app moved it (after a wake or
         // an unplug they do, for a while), so it still goes (live 2026-10-29).

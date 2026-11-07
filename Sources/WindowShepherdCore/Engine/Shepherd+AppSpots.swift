@@ -107,7 +107,9 @@ extension Shepherd {
     /// and it's a main window, it goes to a free spot for its app (a click into it doesn't
     /// stop that; a drag does). One the app moved by itself waits to settle again (at most
     /// `newResetLimit` times). Anything else leaves it where it is, for good.
-    func placeNewWindows(visible: [CGWindow], screens: [ScreenInfo], key: String) {
+    /// `existing`: the tick's one read of the full window list (read only if needed).
+    func placeNewWindows(visible: [CGWindow], screens: [ScreenInfo], key: String,
+                         existing: (() -> Set<UInt32>)? = nil) {
         let previous = previousSighting
         previousSighting = visible
         let t = Date().timeIntervalSince1970
@@ -177,7 +179,7 @@ extension Shepherd {
         for id in firstSeen.keys where !shown.contains(id) { leaveFirstSeen(id) }   // closed, minimized, another Space
         guard !ready.isEmpty else { return }
         for w in ready { leaveFirstSeen(String(w.id)) }   // decided now: placed, or left where it is
-        placeNew(ready, screens: screens, key: key)
+        placeNew(ready, screens: screens, key: key, existing: existing)
     }
 
     /// Never placed as a new window from now on.
@@ -191,10 +193,10 @@ extension Shepherd {
 
     /// Ready new windows, grouped by app, into its free spots: one `.place` job.
     /// Windows with no free spot (or no bundle ID) are left where the app put them.
-    func placeNew(_ windows: [CGWindow], screens: [ScreenInfo], key: String) {
+    func placeNew(_ windows: [CGWindow], screens: [ScreenInfo], key: String, existing read: (() -> Set<UInt32>)? = nil) {
         // Closed windows free their spots first: a ⌘W then ⌘N, or a quit and reopen, comes
         // sooner than the next `forgetSpots`.
-        let existing = system.allWindowIDs()
+        let existing = read?() ?? system.allWindowIDs()
         if !existing.isEmpty { spots.release(existing: existing) }
         var byBundle: [String: [CGWindow]] = [:]
         for w in windows where !spots.holds(key: key, window: String(w.id)) {

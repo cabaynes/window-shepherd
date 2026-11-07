@@ -99,6 +99,20 @@ final class NewWindowPlacementTests: XCTestCase {
         XCTAssertTrue(log().contains("Safari window 5 → its spot on DELL (90% centered), opened at launch"), log())
     }
 
+    /// The tick that places a new window (and saves) reads the full window list once.
+    func testPlacingTickReadsTheWindowListOnce() async {
+        let s = make()
+        seedFreeSpot(s, ninety, on: dell)
+        addApp(10, "Safari", windows: [(5, rect(100))], ago: 1)
+        s.tick()
+        await waitUntil { s.isMainWindow("5") != nil }
+        sys.locked { sys.allIDsReads = 0 }
+        s.tick()                                   // second sighting: placed, and the snapshot saves
+        XCTAssertTrue(s.isBusy, "placing")
+        XCTAssertEqual(sys.locked { sys.allIDsReads }, 1)
+        await waitUntil { !s.isBusy }
+    }
+
     func testNewWindowMidDayAlsoPlaced() async {
         addApp(10, "Safari", windows: [(1, rect(150))])
         let s = make()
