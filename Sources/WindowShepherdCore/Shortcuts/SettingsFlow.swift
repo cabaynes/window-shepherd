@@ -8,6 +8,12 @@ public protocol ShortcutApplying: AnyObject {
     /// While recording, every Window Shepherd shortcut is off, so pressing one
     /// records it instead of moving a window.
     func suspend(_ on: Bool)
+    /// Shortcuts (Combo.id) macOS refused to register just now: shown red in Customize.
+    var refusedCombos: Set<String> { get }
+}
+
+public extension ShortcutApplying {
+    var refusedCombos: Set<String> { [] }
 }
 
 /// The Customize Shortcuts window's behaviour, without the UI: recording,
@@ -48,7 +54,9 @@ public final class SettingsFlow {
     }
 
     public var config: ShortcutConfig { target.config }
-    public var vm: SettingsVM { settingsVM(config: target.config, sources: sources, systemCheck: systemCheck) }
+    public var vm: SettingsVM {
+        settingsVM(config: target.config, sources: sources, systemCheck: systemCheck, refused: target.refusedCombos)
+    }
 
     public var statusText: String {
         scanning ? "Checking your open apps for clashes… " + (progress ?? "")

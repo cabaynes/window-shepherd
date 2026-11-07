@@ -6,6 +6,7 @@ final class FakeTarget: ShortcutApplying {
     var config = ShortcutConfig.defaults
     var applied: [ShortcutConfig] = []
     var suspends: [Bool] = []
+    var refusedCombos: Set<String> = []
     func apply(_ cfg: ShortcutConfig, save: Bool) { config = cfg; applied.append(cfg) }
     func suspend(_ on: Bool) { suspends.append(on) }
 }
@@ -28,6 +29,16 @@ final class SettingsFlowTests: XCTestCase {
         flow.stopRecording()
         XCTAssertNil(flow.recording)
         XCTAssertEqual(target.suspends, [true, false])
+    }
+
+    /// A shortcut macOS refused to register shows red on its row, saying so.
+    func testRefusedShortcutShowsRed() {
+        target.refusedCombos = [Combo("g", .alt, .cmd).id]
+        let row = flow.vm.rows.first { $0.entry == .action(.almost) }
+        XCTAssertEqual(row?.level, .block)
+        XCTAssertEqual(row?.text?.contains("macOS refused"), true, row?.text ?? "")
+        let chip = flow.vm.rows.first { $0.entry == .action(.almost) }?.chips.first
+        XCTAssertNil(chip?.level, "only the refused key is red")
     }
 
     func testCleanChangeAppliesAtOnce() {

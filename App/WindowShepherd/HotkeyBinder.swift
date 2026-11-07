@@ -115,6 +115,12 @@ final class HotkeyBinder {
         enableAsDecided()
     }
 
+    /// Keys that should be on but macOS refused to register (shown red in Customize).
+    var refusedCombos: Set<String> {
+        Set((windowKeys + numberKeys + (menuKey.map { [$0] } ?? []))
+            .filter { shouldEnable($0) && !$0.isEnabled }.map(\.combo.id))
+    }
+
     /// The one rule for every key: on, unless recording or Rectangle has it.
     private func shouldEnable(_ hk: Hotkey) -> Bool {
         !suspended && !rectangleKeys.contains(hk.combo.id)

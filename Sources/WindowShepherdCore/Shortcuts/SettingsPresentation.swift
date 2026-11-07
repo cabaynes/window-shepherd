@@ -37,8 +37,14 @@ public struct SettingsVM: Equatable {
 /// What the Customize Shortcuts window shows for `config`, with every clash
 /// the sources know about.
 public func settingsVM(config: ShortcutConfig, sources: ClashSources,
-                       systemCheck: ([Combo]) -> [SystemShortcut]) -> SettingsVM {
-    let (found, bindings) = findings(for: config, sources: sources, systemCheck: systemCheck)
+                       systemCheck: ([Combo]) -> [SystemShortcut], refused: Set<String> = []) -> SettingsVM {
+    var (found, bindings) = findings(for: config, sources: sources, systemCheck: systemCheck)
+    // Refused by macOS when it was bound (another app may hold it system-wide): first, in red.
+    for id in refused {
+        found[id, default: []].insert(Finding(level: .block, source: "macOS",
+                                              text: "macOS refused this shortcut, so it doesn't work right now. "
+                                                  + "Another app may be using it; pick a different one."), at: 0)
+    }
     let defaults = ShortcutConfig.defaults
     func chip(_ owner: Owner, _ scope: Scope, next: Bool = false, screen: Int? = nil, _ label: String) -> ChipVM {
         guard let b = bindings.find(owner, scope, next: next, screen: screen) else {
