@@ -63,12 +63,12 @@ extension Shepherd {
         let due = landing.due(now: nowSeconds, after: Self.landingCheckAfter)
         guard !due.isEmpty else { return }
         let byID = Dictionary(visible.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
-        let mouse = system.lastMouseUse()
+        let mouse = system.lastMouseDrag()   // a click moves no window: only a drag makes it yours
         var misses: [(Landing.Expect, CGWindow)] = []
         for e in due {
             // Asked before the last screen change: its target was for the old setup.
             guard e.at >= book.changedAt, let w = byID[e.id] else { continue }   // closed, minimized, another Space
-            // The mouse was used since: you may have dragged it, and where you put it is yours (the snapshot records it).
+            // Dragged since: you may have moved it, and where you put it is yours (the snapshot records it).
             if let mouse, mouse > e.movedAt { continue }
             if !Self.landed(w.frame, wanted: e.wanted, resizable: e.resizable) {
                 misses.append((e, w))
@@ -102,6 +102,7 @@ extension Shepherd {
         retryOffer = RetryOffer(kind: kind, at: now(), missed: all, run: { [weak self] picked in
             guard let self else { return }
             var restoreToo = false
+            var moves: [(sub: [pid_t: Set<UInt32>], placer: Placer, label: String)] = []
             for g in groups {
                 var sub: [pid_t: Set<UInt32>] = [:]
                 for (pid, ids) in g.byPid {
@@ -111,9 +112,16 @@ extension Shepherd {
                 guard !sub.isEmpty else { continue }
                 switch g.retry {
                 case .restore: restoreToo = true
-                case let .move(placer, label): self.apply(Selection(byPid: sub, retry: true), placer: placer, label: label)
+                case let .move(placer, label): moves.append((sub, placer, label))
                 }
             }
+            // One move after another: a second one started at once would interrupt the first.
+            @MainActor func next(_ i: Int) {
+                guard i < moves.count else { return }
+                let m = moves[i]
+                self.apply(Selection(byPid: m.sub, retry: true), placer: m.placer, label: m.label) { next(i + 1) }
+            }
+            next(0)
             guard restoreToo else { return }
             // Kept in restoredIds so no later pass sends them again by itself; the Retry row
             // lets them go once more, unless you've moved them since (no longer protected).

@@ -48,7 +48,7 @@ final class AppSpotRecordingTests: XCTestCase {
 
     /// You drag it with the mouse.
     func drag(_ id: UInt32, to r: CGRect) {
-        sys.locked { sys.mouseUsed = Date() }
+        sys.locked { sys.mouseUsed = Date(); sys.mouseDragged = sys.mouseUsed }
         move(id, to: r)
     }
 
@@ -166,6 +166,33 @@ final class AppSpotRecordingTests: XCTestCase {
         XCTAssertTrue(Geometry.sameSpot(list.first?.spot, place(rect(1100))), "\(list)")
     }
 
+    /// Revert pressed while another move runs waits for it, and still records spots.
+    func testRevertThatWaitsForAMoveStillRecordsSpots() async {
+        addApp(10, "Safari", windows: [(1, rect(1100))])
+        addApp(20, "Finder", windows: [(2, rect(1600))])
+        let s = make()
+        s.tick()
+        await waitUntil { s.isMainWindow("1") != nil }
+        clock = clock.addingTimeInterval(120)
+        sys.allScreens = [lap]
+        move(1, to: rect(50)); move(2, to: rect(60))
+        s.screensChanged()
+        await waitUntil { !s.isBusy }
+        sys.allScreens = [lap, dell]
+        s.tick()
+        await waitUntil(4) { !s.isBusy }
+        move(1, to: rect(1500))
+        s.tick(); s.tick()
+        sys.setDelay = [2: 0.3]
+        s.apply(Selection(pid: 20), placer: .fraction(0.9, on: .own), label: "90%")   // a slow move is running…
+        XCTAssertTrue(s.isBusy)
+        s.revert()                                                                    // …when you press Revert
+        await waitUntil(4) { !s.isBusy && self.sys.frameOf(1)?.minX == 1100 }
+        XCTAssertEqual(sys.frameOf(1)?.minX ?? 0, 1100, accuracy: 0.5, "reverted")
+        let list = spots(s, "Safari")
+        XCTAssertEqual(list.count, 1, "\(list)")
+    }
+
     /// As in UndockedTests: Safari remembered on the Dell; unplug; Notes window 7
     /// opens on the built-in screen; plug the Dell back in.
     func testUndockedDefaultRecordsSpot() async {
@@ -200,6 +227,7 @@ final class AppSpotRecordingTests: XCTestCase {
         }
         sys.locked {
             sys.mouseUsed = Date()
+            sys.mouseDragged = sys.mouseUsed
             sys.windows = sys.windows.map { CGWindow(id: $0.id, pid: $0.pid, app: $0.app, title: $0.title, frame: $0.frame.offsetBy(dx: 0, dy: 40)) }
         }
         for _ in 0..<3 {

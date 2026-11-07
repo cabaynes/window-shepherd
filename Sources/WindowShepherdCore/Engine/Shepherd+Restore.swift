@@ -53,6 +53,7 @@ extension Shepherd {
             draggedNew = []                                   // and where it puts them isn't yours
             setFlashing(false)
             resumeRestore = false   // that restore was for the old setup
+            revertPending = false   // and so was a Revert still waiting to run
             if let job = runner.current {   // it was moving/restoring for the old setup: stop it
                 Log.info("stopped a \(job.kind.rawValue) that was running for the previous screen setup")
                 runner.stopCurrent(reportAs: nil)
@@ -108,7 +109,8 @@ extension Shepherd {
         recordMoves(snap.moved, windows: visible, key: key, screens: screens)
         recordDraggedNew(visible, key: key, screens: screens)
         noteSnapshot()
-        spots.touch(key: key, visible: book.visibleAtLastTick, now: nowSeconds)
+        // A window still on its way to its spot isn't in it yet.
+        spots.touch(key: key, visible: book.visibleAtLastTick.subtracting(placing?.pending ?? []), now: nowSeconds)
         if snap.changed || Date().timeIntervalSince1970 - store.lastSaved > 600 {
             let existing = system.allWindowIDs()
             book.forgetClosed(existing: existing, running: Set(system.runningApps().keys))
@@ -209,7 +211,8 @@ extension Shepherd {
 
     /// `patience`: seconds to keep retrying from now; nil = what's left since the screen change.
     /// `recordsSpots`: every window it moves becomes an app spot (Revert: your choice of
-    /// arrangement); later passes and the Retry row don't inherit it.
+    /// arrangement); later passes and the Retry row don't inherit it, but a Revert that has to
+    /// wait for another job (or is interrupted by your move) keeps it until it runs (`revertPending`).
     func restore(patience: TimeInterval? = nil, recordsSpots: Bool = false) {
         let screens = system.screens()
         let key = Screens.setupKey(screens)
@@ -221,6 +224,7 @@ extension Shepherd {
             schedulePass(after: restoreTiming.busyRecheck)
             return
         }
+        let recordsSpots = recordsSpots || revertPending
         let running = Set(system.runningApps().keys)
         let existing = system.allWindowIDs()
         if book.forgetClosed(existing: existing, running: running) { store.save(book.layouts) }
@@ -236,6 +240,7 @@ extension Shepherd {
         addHomeless(to: &plan, windows: visibleNow, screens: screens)
         guard let plan, !plan.isEmpty else {
             book.settled = true
+            if recordsSpots { revertPending = false }
             offerRetry(.restore, missed: [:]) { _ in }   // nothing left to put back
             return
         }
@@ -295,6 +300,8 @@ extension Shepherd {
             var refused = tally.refused.values.reduce(0) { $0 + $1.count }
             if problem == .interrupted && self.book.lastSetup == key {
                 self.resumeRestore = true           // your move came first; the restore picks up after it
+            } else if recordsSpots {
+                self.revertPending = false          // the Revert ran
             }
             let visible = self.system.visibleWindows()
             self.book.restoreFinished(plan: plan, visible: Set(visible.map { String($0.id) }))
@@ -322,7 +329,9 @@ extension Shepherd {
 
     /// Just before a restore or placement moves a window: true if you placed it
     /// since the plan was made, so it's yours now and stays where it is.
-    func placedByYou(_ id: UInt32, from: Spot?, plannedAt: Date, screens: [ScreenInfo]) -> Bool {
+    /// `then`: what the log says happens next when it wasn't you.
+    func placedByYou(_ id: UInt32, from: Spot?, plannedAt: Date, screens: [ScreenInfo],
+                     then: String = "putting it back") -> Bool {
         if book.restoredIds.contains(String(id)) { return true }   // a hotkey or menu move while the job ran
         if snapping.values.contains(where: { $0.contains(id) }) { return true }   // a keyboard snap is moving it
         // Dragged since the plan was made (no snapshot runs during a job): yours now.
@@ -331,7 +340,7 @@ extension Shepherd {
         guard let from, let w = system.visibleWindows().first(where: { $0.id == id }),
               !Geometry.sameSpot(Geometry.whereIs(w.frame, in: screens), from) else { return false }
         guard let used = system.lastMouseUse(), used > plannedAt else {
-            Log.info("\(w.app) window \(id) moved since the plan with no mouse use: putting it back")
+            Log.info("\(w.app) window \(id) moved since the plan with no mouse use: \(then)")
             return false
         }
         Log.info("\(w.app) window \(id) dragged since the plan: left there")

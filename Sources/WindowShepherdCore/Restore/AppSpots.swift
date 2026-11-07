@@ -80,18 +80,22 @@ public final class AppSpotBook {
         }
     }
 
-    /// Drop unheld spots unused for `forgetAfter`.
+    /// Drop unheld spots unused for `forgetAfter`, and apps and setups left with none.
     public func forgetOld(now: Double) {
         for (key, byApp) in spots {
+            var kept: [String: [AppSpot]] = [:]
             for (bundle, list) in byApp {
-                spots[key]?[bundle] = list.filter { isHeld($0.id, key: key) || now - $0.used < forgetAfter }
+                let left = list.filter { isHeld($0.id, key: key) || now - $0.used < forgetAfter }
+                if !left.isEmpty { kept[bundle] = left }
             }
+            spots[key] = kept.isEmpty ? nil : kept
         }
     }
 
     /// Free spots for windows this book doesn't place yet: takes the N most
     /// recently used free spots, then pairs each window with the nearest of
-    /// them to where it is (`at`), and marks them held. Returns window id → spot.
+    /// them to where it is (`at`), and marks them held. Returns window id → spot. A spot's
+    /// `used` isn't changed here: the move may fail; the caller touches it once the window is in it.
     public func assign(key: String, bundle: String, windows: [(id: String, at: Spot?)], now: Double) -> [String: AppSpot] {
         let free = (spots[key]?[bundle] ?? []).filter { !isHeld($0.id, key: key) }
         // Stable sort: ties keep their list order.
@@ -117,11 +121,9 @@ public final class AppSpotBook {
         var result: [String: AppSpot] = [:]
         for p in pairs where !usedSpots.contains(p.spot) && !usedWins.contains(p.win) {
             usedSpots.insert(p.spot); usedWins.insert(p.win)
-            var s = pool[p.spot]
-            s.used = now
+            let s = pool[p.spot]
             result[windows[p.win].id] = s
             holders[key, default: [:]][windows[p.win].id] = s.id
-            if let i = spots[key]?[bundle]?.firstIndex(where: { $0.id == s.id }) { spots[key]?[bundle]?[i].used = now }
         }
         return result
     }

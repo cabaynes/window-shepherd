@@ -99,6 +99,8 @@ public final class Shepherd {
     var pendingPasses = 0
     /// A restore your own move interrupted: run it again once the move is done.
     var resumeRestore = false
+    /// A Revert that hasn't run yet (it waited for another job, or your move interrupted it).
+    var revertPending = false
     /// The window list at the last settled tick (to tell a tab switch from a window coming back).
     var lastTickWindows: [CGWindow] = []
     var restoreTimers: [Int: Task<Void, Never>] = [:]
@@ -157,8 +159,9 @@ public final class Shepherd {
 
     /// Run `placer` on a selection of windows. Moved windows count as placed
     /// by you (a pending auto-restore leaves them alone) and are saved at
-    /// once. Acting on a whole app brings that app to the front.
-    public func apply(_ sel: Selection, placer: Placer, label: String) {
+    /// once. Acting on a whole app brings that app to the front. `then` runs once it's done,
+    /// unless a newer move interrupted it.
+    public func apply(_ sel: Selection, placer: Placer, label: String, then: (@MainActor () -> Void)? = nil) {
         let startSetup = book.lastSetup     // if the screens change mid-move, save nothing
         let screens = system.screens()
         let main = system.mainScreen()
@@ -167,6 +170,7 @@ public final class Shepherd {
         if !sel.retry { retryOffer = nil }   // a new move replaces the old offer
 
         func finish(_ problem: JobProblem?) {
+            defer { if problem != .interrupted { then?() } }
             tally.settle()
             let total = tally.moved
             let refused = tally.refused.values.reduce(0) { $0 + $1.count }

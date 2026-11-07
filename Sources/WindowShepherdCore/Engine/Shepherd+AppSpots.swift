@@ -227,7 +227,8 @@ extension Shepherd {
                     skip: { [weak self] id in
                         guard let self else { return true }
                         let wasYours = self.book.restoredIds.contains(String(id))
-                        guard self.placedByYou(id, from: plan[pid]?[id]?.from, plannedAt: plannedAt, screens: screens) else { return false }
+                        guard self.placedByYou(id, from: plan[pid]?[id]?.from, plannedAt: plannedAt, screens: screens,
+                                               then: "still placing it") else { return false }
                         self.releasePlacing(String(id))      // never in the spot it was given
                         if !wasYours { self.draggedNew.insert(String(id)) }   // dragged: its place becomes a spot
                         return true
@@ -240,8 +241,11 @@ extension Shepherd {
                         guard let self else { return }
                         self.book.restoredIds.insert(t.id)
                         self.placing?.pending.remove(t.id)   // in its spot: the hold is real now
+                        self.spots.touch(key: key, visible: [t.id], now: self.nowSeconds)
                         let name = screens.first { $0.uuid == t.screenUUID }?.name ?? t.screenUUID
-                        let why = self.inGuessingPeriod(pid: pid) ? "opened at launch" : "new window"
+                        let launched = self.system.launchDate(pid: pid)
+                        let atLaunch = launched.map { self.now().timeIntervalSince($0) < self.restoreTiming.guessing } == true
+                        let why = atLaunch ? "opened at launch" : "new window"
                         Log.info("\(apps[id] ?? "?") window \(id) → its spot on \(name) (\(Self.unitLabel(t.unit))), \(why)")
                     })
         }

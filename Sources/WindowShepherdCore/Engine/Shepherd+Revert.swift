@@ -48,6 +48,7 @@ extension Shepherd {
         for id in copy.layout.keys { book.protect[id] = nil }
         Log.info("revert \(Screens.setupLabel(system.screens())) to its frozen copy (\(copy.layout.count) windows)")
         book.restoredIds = []
+        revertPending = true
         restore(patience: restoreTiming.patience, recordsSpots: true)
         updateBusy()
     }

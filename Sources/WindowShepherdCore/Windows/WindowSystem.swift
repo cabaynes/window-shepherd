@@ -42,6 +42,8 @@ public protocol WindowSystem: AnyObject {
     /// When the left mouse button was last pressed or dragged, in any app:
     /// a window that moved without it was moved by macOS or its app, not by you.
     func lastMouseUse() -> Date?                 // main
+    /// When the left mouse button was last dragged (a click moves no window).
+    func lastMouseDrag() -> Date?                // main
     func appWindows(pid: pid_t) throws -> [WindowHandle]   // worker
     func focusedWindow(pid: pid_t) -> WindowHandle?        // worker
     func activate(pid: pid_t)                              // worker

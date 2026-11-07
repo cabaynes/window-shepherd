@@ -192,6 +192,27 @@ final class LandingTests: XCTestCase {
         XCTAssertEqual(sys.frameOf(1)?.minY ?? 0, Geometry.place(ninety, in: dell.frame).minY, accuracy: 0.5)
     }
 
+    /// Misses from two different moves in one check: Retry runs both moves, one after the other.
+    func testRetryOfTwoDifferentMovesRunsBoth() async {
+        addApp(10, "Safari", windows: [(1, rect(100))])
+        addApp(20, "Finder", windows: [(2, rect(150))])
+        sys.ignorePosition = [1, 2]
+        let s = make()
+        s.apply(Selection(pid: 10), placer: .fraction(0.9, on: .fixed(uuid: dell.uuid)), label: "DELL (90%)")
+        await waitUntil { !s.isBusy }
+        s.apply(Selection(pid: 20), placer: .fraction(0.9, on: .own), label: "90%")
+        await waitUntil { !s.isBusy }
+        later(s)
+        XCTAssertEqual(s.retryOffer?.missed, [10: [1], 20: [2]])
+        sys.ignorePosition = []
+        sys.setDelay = [1: 0.2, 2: 0.2]
+        s.runRetry()
+        await waitUntil(4) { !s.isBusy && self.sys.setCount(1) == 2 && self.sys.setCount(2) == 2 }
+        XCTAssertEqual(sys.setCount(1), 2, "Safari's move was tried again")
+        XCTAssertEqual(sys.setCount(2), 2, "Finder's move was tried again")
+        XCTAssertEqual(sys.frameOf(1)?.minX ?? 0, Geometry.place(ninety, in: dell.frame).minX, accuracy: 0.5)
+    }
+
     func testRestoreMissRetriesViaRestore() async {
         sys.ignorePosition = [1]
         let s = await restoredOnce()
@@ -297,8 +318,20 @@ final class LandingTests: XCTestCase {
 
     /// You drag it with the mouse.
     func drag(_ id: UInt32, to r: CGRect) {
-        sys.locked { sys.mouseUsed = Date() }
+        sys.locked { sys.mouseUsed = Date(); sys.mouseDragged = sys.mouseUsed }
         move(id, to: r)
+    }
+
+    /// A click (into a text field, a menu) doesn't move windows: the check still runs.
+    func testClickBeforeTheCheckStillChecks() async {
+        addApp(10, "Safari", windows: [(1, rect(100))])
+        sys.ignorePosition = [1]
+        let s = make()
+        await snap(s)
+        sys.locked { sys.mouseUsed = Date() }   // a click, no drag
+        later(s)
+        XCTAssertTrue(s.book.leftBehind.contains("1"))
+        XCTAssertEqual(s.retryOffer?.missed, [10: [1]])
     }
 
     func testDragBeforeTheCheckIsYours() async {

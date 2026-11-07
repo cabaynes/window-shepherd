@@ -46,7 +46,7 @@ final class ShepherdRestoreTests: XCTestCase {
 
     /// You drag it with the mouse.
     func drag(_ id: UInt32, to r: CGRect) {
-        sys.locked { sys.mouseUsed = Date() }
+        sys.locked { sys.mouseUsed = Date(); sys.mouseDragged = sys.mouseUsed }
         move(id, to: r)
     }
 

@@ -116,4 +116,15 @@ final class AppSpotBookTests: XCTestCase {
         b.forgetOld(now: now)
         XCTAssertEqual(list(b).map(\.id), ["heldOld"])
     }
+
+    /// An app (or a whole setup) left with no spots is dropped, not saved as an empty list.
+    func testForgetOldDropsEmptyAppsAndSetups() {
+        let now = 40 * day
+        let b = AppSpotBook(spots: [key: [bundle: [appSpot("old", "L", 0, used: now - 31 * day)],
+                                          "com.example.Kept": [appSpot("new", "L", 0, used: now)]],
+                                    "K2": [bundle: [appSpot("old2", "L", 0, used: now - 31 * day)]]])
+        b.forgetOld(now: now)
+        XCTAssertEqual(b.spots[key]?.keys.sorted(), ["com.example.Kept"])
+        XCTAssertNil(b.spots["K2"])
+    }
 }

@@ -111,17 +111,21 @@ final class AXWindow: WindowHandle {
 /// guard, each app and window element we create.
 public final class LiveWindowSystem: WindowSystem {
     private var mouseUsed: Date?
+    private var mouseDragged: Date?
     private var mouseMonitor: Any?
 
     public init() {
         AXUIElementSetMessagingTimeout(AXUIElementCreateSystemWide(), axTimeout)
         // Only notes the time: nothing here can slow the Mac.
-        mouseMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .leftMouseDragged]) { [weak self] _ in
-            self?.mouseUsed = Date()
+        mouseMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .leftMouseDragged]) { [weak self] event in
+            let now = Date()
+            self?.mouseUsed = now
+            if event.type == .leftMouseDragged { self?.mouseDragged = now }
         }
     }
 
     public func lastMouseUse() -> Date? { mouseUsed }
+    public func lastMouseDrag() -> Date? { mouseDragged }
 
     public func visibleWindows() -> [CGWindow] { CGWindow.current() }
     public func allWindowIDs() -> Set<UInt32> { CGWindow.allIDs() }
@@ -146,8 +150,10 @@ public final class LiveWindowSystem: WindowSystem {
     public func bundleID(appName: String) -> String? {
         if let a = NSWorkspace.shared.runningApplications.first(where: { $0.localizedName == appName }),
            let id = a.bundleIdentifier { return id }
-        guard let path = NSWorkspace.shared.fullPath(forApplication: appName) else { return nil }
-        return Bundle(path: path)?.bundleIdentifier
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        let folders = ["/Applications", "/Applications/Utilities", "/System/Applications",
+                       "/System/Applications/Utilities", home + "/Applications"]
+        return folders.lazy.compactMap { Bundle(path: "\($0)/\(appName).app")?.bundleIdentifier }.first
     }
 
     public func launchDate(pid: pid_t) -> Date? { NSRunningApplication(processIdentifier: pid)?.launchDate }

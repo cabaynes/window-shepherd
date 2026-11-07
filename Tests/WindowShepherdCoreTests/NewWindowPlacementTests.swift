@@ -53,6 +53,7 @@ final class NewWindowPlacementTests: XCTestCase {
     func drag(_ id: UInt32, to r: CGRect) {
         sys.locked {
             sys.mouseUsed = Date()
+            sys.mouseDragged = sys.mouseUsed
             let i = sys.windows.firstIndex { $0.id == id }!
             let w = sys.windows[i]
             sys.windows[i] = CGWindow(id: w.id, pid: w.pid, app: w.app, title: w.title, frame: r)
@@ -107,6 +108,64 @@ final class NewWindowPlacementTests: XCTestCase {
         XCTAssertEqual(sys.frameOf(5), dell90)
         XCTAssertEqual(sys.frameOf(1), rect(150), "the window that was already open stays")
         XCTAssertTrue(log().contains("Safari window 5 → its spot on DELL (90% centered), new window"), log())
+    }
+
+    /// "opened at launch" means its app just launched: not a ⌘N shortly after a wake.
+    func testNewWindowAfterAWakeIsNotCalledOpenedAtLaunch() async {
+        addApp(10, "Safari", windows: [(1, rect(150))])
+        let s = make()
+        seedFreeSpot(s, ninety, on: dell)
+        s.didWake()
+        addApp(10, "Safari", windows: [(5, rect(100))])   // ⌘N, an hour after Safari launched
+        await settle(s, 5)
+        XCTAssertEqual(sys.frameOf(5), dell90)
+        XCTAssertTrue(log().contains("Safari window 5 → its spot on DELL (90% centered), new window"), log())
+    }
+
+    /// A new window its app moves while the placement is on another app: the log says it's
+    /// still being placed (it was never anywhere to be "put back" to).
+    func testPlacementLogSaysPlacingNotPuttingBack() async {
+        let s = make()
+        seedFreeSpot(s, ninety, on: dell)
+        seedFreeSpot(s, ninety, on: dell, app: "Notes")
+        sys.setDelay = [5: 0.3]                              // Safari goes first, slowly
+        addApp(10, "Safari", windows: [(5, rect(100))], ago: 1)
+        addApp(11, "Notes", windows: [(6, rect(300))], ago: 1)
+        s.tick()
+        await waitUntil { s.isMainWindow("5") != nil && s.isMainWindow("6") != nil }
+        s.tick()
+        XCTAssertTrue(s.isBusy, "placing both")
+        sys.locked {                                         // Notes nudges its window, no mouse
+            let i = sys.windows.firstIndex { $0.id == 6 }!
+            sys.windows[i] = CGWindow(id: 6, pid: 11, app: "Notes", title: "Doc", frame: rect(320))
+        }
+        await waitUntil { !s.isBusy }
+        let text = log()
+        XCTAssertTrue(text.contains("Notes window 6 moved since the plan with no mouse use: still placing it"), text)
+        XCTAssertFalse(text.contains("putting it back"), text)
+    }
+
+    /// A keyboard move of a new window while its placement waits on another app: yours wins,
+    /// the placement leaves it, and the spot it was being given is free again.
+    func testHotkeyMoveDuringAPlacementWins() async {
+        let s = make()
+        seedFreeSpot(s, ninety, on: dell)
+        seedFreeSpot(s, ninety, on: dell, app: "Notes")
+        sys.setDelay = [4: 0.3]                               // Notes is placed first, slowly
+        addApp(9, "Notes", windows: [(4, rect(300))], ago: 1)
+        addApp(10, "Safari", windows: [(5, rect(100))], ago: 1)
+        s.tick()
+        await waitUntil { s.isMainWindow("4") != nil && s.isMainWindow("5") != nil }
+        s.tick()
+        XCTAssertTrue(s.isBusy, "placing both")
+        s.apply(Selection(pid: 10, winId: 5, quiet: true), placer: .unit(full, .own), label: "Full screen")
+        await waitUntil { !s.isBusy && s.snapInFlight.isEmpty }
+        let snapped = Geometry.place(full, in: lap.frame)
+        XCTAssertEqual(sys.frameOf(5), snapped, "where your key put it")
+        XCTAssertEqual(sys.setCount(5), 1, "the placement never moved it")
+        let free = spots(s, "Safari").first { Geometry.sameSpot($0.spot, Spot(scr: dell.uuid, unit: ninety)) }
+        XCTAssertNotNil(free)
+        XCTAssertFalse(s.spots.holders[key]?.values.contains(free?.id ?? "") ?? false, "the spot it was being given is free")
     }
 
     func testDraggedBeforeSecondSightingIsLeftAndBecomesASpot() async {
@@ -217,6 +276,20 @@ final class NewWindowPlacementTests: XCTestCase {
         XCTAssertEqual(sys.frameOf(5), rect(100))
         XCTAssertFalse(s.spots.holds(key: key, window: "5"), "not placed: its spot is free again")
         XCTAssertEqual(spots(s, "Safari").count, 1)
+    }
+
+    /// A spot counts as used only once a window is in it: a refused move leaves its age alone
+    /// (or an unused spot would never age out, and would win "most recent" over spots you use).
+    func testRefusedMoveLeavesTheSpotsAgeAlone() async {
+        sys.failSet = [5]
+        let s = make()
+        let old = clock.timeIntervalSince1970 - 1000
+        s.spots.record(key: key, bundle: "test.Safari", window: "99", at: Spot(scr: dell.uuid, unit: ninety), now: old)
+        s.spots.release(existing: sys.allWindowIDs())
+        addApp(10, "Safari", windows: [(5, rect(100))], ago: 1)
+        await settle(s, 5)
+        XCTAssertEqual(sys.frameOf(5), rect(100))
+        XCTAssertEqual(spots(s, "Safari").first?.used, old)
     }
 
     func testDialogNotPlaced() async {

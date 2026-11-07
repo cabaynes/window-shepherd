@@ -175,6 +175,29 @@ final class AppSpotRestoreTests: XCTestCase {
                       "the spot is unchanged")
     }
 
+    /// Two windows opened while undocked, one free spot for their app: one goes to it, the
+    /// other gets the undocked default (precedence: entry → free spot → undocked default), which
+    /// makes its place a spot.
+    func testPlugInWithMoreWindowsThanFreeSpots() async {
+        let s = make(spots: [dockedKey: ["test.Safari": [AppSpot(id: "D", scr: dell.uuid, unit: sixty, used: used)]]])
+        s.tick()
+        sys.allScreens = [lap]
+        s.screensChanged()
+        await waitUntil { !s.isBusy }
+        addApp(10, "Safari", windows: [(7, rect(40)), (8, rect(500))])
+        await learnKind(s, 7)
+        await waitUntil { s.isMainWindow("8") != nil }
+        sys.allScreens = [lap, dell]
+        s.tick()
+        await waitUntil(4) { !s.isBusy }
+        let inSpot = [7, 8].filter { sys.frameOf($0) == Geometry.place(sixty, in: dell.frame) }
+        XCTAssertEqual(inSpot.count, 1, "one window in the one spot")
+        let other: UInt32 = inSpot.first == 7 ? 8 : 7
+        XCTAssertEqual(sys.frameOf(other), Geometry.place(ninety, in: dell.frame), "the extra: the undocked default")
+        XCTAssertEqual(s.spots.spots[dockedKey]?["test.Safari"]?.count, 2, "the undocked default's place is a spot")
+        XCTAssertTrue(log().contains("Safari window \(other) → DELL (90% centered), opened while undocked"), log())
+    }
+
     func testPlugInUndockedDefaultForAppWithoutSpots() async {
         let s = make()
         await openWhileUndockedThenPlugIn(s, pid: 30, app: "Notes", id: 7)
