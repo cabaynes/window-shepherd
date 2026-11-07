@@ -247,7 +247,8 @@ extension Shepherd {
                         let atLaunch = launched.map { self.now().timeIntervalSince($0) < self.restoreTiming.guessing } == true
                         let why = atLaunch ? "opened at launch" : "new window"
                         Log.info("\(apps[id] ?? "?") window \(id) → its spot on \(name) (\(Self.unitLabel(t.unit))), \(why)")
-                    })
+                    },
+                    onFullScreen: { [weak self] id in self?.releasePlacing(String(id)) })
         }
         let count = plan.values.reduce(0) { $0 + $1.count }
         runner.run(.place, steps: steps, deadline: deadlineFor(windowCount: count)) { [weak self] _ in

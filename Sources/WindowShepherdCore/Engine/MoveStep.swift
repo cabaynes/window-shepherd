@@ -90,7 +90,8 @@ public func appStep<V>(pid: pid_t, wanted: [UInt32: V], system: WindowSystem, wo
                        gate: @escaping @MainActor () -> Bool = { true },
                        skip: @escaping @MainActor (UInt32) -> Bool = { _ in false },
                        action: @escaping (WindowHandle, V) throws -> Void,
-                       onMoved: @escaping @MainActor (UInt32, V) -> Void = { _, _ in }) -> JobStep {
+                       onMoved: @escaping @MainActor (UInt32, V) -> Void = { _, _ in },
+                       onFullScreen: @escaping @MainActor (UInt32) -> Void = { _ in }) -> JobStep {
     return { ctx in
         tally.waiting[pid] = nil
         guard let name = system.appName(pid: pid) else { return nil }   // the app quit
@@ -107,7 +108,7 @@ public func appStep<V>(pid: pid_t, wanted: [UInt32: V], system: WindowSystem, wo
                 ctx.append(waitStep(wait))
                 ctx.append(appStep(pid: pid, wanted: rest, system: system, worker: worker, timing: timing, tally: tally,
                                    try: attempt + 1, partly: wasPartly, patientUntil: patientUntil,
-                                   gate: gate, skip: skip, action: action, onMoved: onMoved))
+                                   gate: gate, skip: skip, action: action, onMoved: onMoved, onFullScreen: onFullScreen))
                 return
             }
             tally.skipped.append(wasPartly ? name + ", partly" : name)
@@ -150,8 +151,17 @@ public func appStep<V>(pid: pid_t, wanted: [UInt32: V], system: WindowSystem, wo
                 if dead.on || !gate() { return nil }
                 if skip(id) { yours += 1; return nil }
                 let t1 = Date()
-                let error: Int32? = await worker.run {
-                    do { try action(win, value); return nil } catch { return (error as? AXFailure)?.code ?? 0 }
+                // A window in native full screen has its own Space: left alone, like Rectangle does.
+                let error: Int32?? = await worker.run {
+                    if win.isFullScreen { return .none }
+                    do { try action(win, value); return .some(nil) } catch { return .some((error as? AXFailure)?.code ?? 0) }
+                }
+                guard let error else {
+                    if gate() {
+                        Log.info("\(name) window \(id) is in full screen: left alone")
+                        onFullScreen(id)
+                    }
+                    return nil
                 }
                 let ok = error == nil
                 if let error { refused.append(error); refusedIDs.insert(id) }
@@ -185,7 +195,7 @@ public func appStep<V>(pid: pid_t, wanted: [UInt32: V], system: WindowSystem, wo
                 ctx.append(waitStep(wait))
                 ctx.append(appStep(pid: pid, wanted: again, system: system, worker: worker, timing: timing, tally: tally,
                                    try: attempt + 1, partly: partly || !done.isEmpty, patientUntil: patientUntil,
-                                   gate: gate, skip: skip, action: action, onMoved: onMoved))
+                                   gate: gate, skip: skip, action: action, onMoved: onMoved, onFullScreen: onFullScreen))
             } else {
                 tally.refused[pid, default: [:]].merge(again) { a, _ in a }
                 tally.missed[pid, default: [:]].merge(again) { a, _ in a }

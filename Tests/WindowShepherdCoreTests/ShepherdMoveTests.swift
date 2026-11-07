@@ -352,4 +352,28 @@ final class ShepherdMoveTests: XCTestCase {
         await waitUntil { s.retryRows()?.titles == ["Safari — Quarterly report"] }
         XCTAssertEqual(s.retryRows()?.titles, ["Safari — Quarterly report"])
     }
+
+    /// A window in native full screen is left alone by a bulk move: not moved, not offered for Retry.
+    func testBulkMoveLeavesFullScreenWindowsAlone() async {
+        sys.addApp(10, "Safari", windows: [(1, rect(100)), (2, rect(150))])
+        sys.fullScreen = [2]
+        let s = make()
+        s.apply(Selection(pid: 10), placer: .fraction(0.9, on: .fixed(uuid: dell.uuid)), label: "DELL (90%)")
+        await waitUntil { !s.isBusy }
+        XCTAssertEqual(sys.setCount(1), 1)
+        XCTAssertEqual(sys.setCount(2), 0, "full screen: left alone")
+        XCTAssertNil(s.retryOffer)
+    }
+
+    /// A keyboard snap on a full-screen window does nothing and says why.
+    func testSnapOnAFullScreenWindowSaysWhy() async {
+        sys.addApp(10, "Safari", windows: [(1, rect(100))])
+        sys.fullScreen = [1]
+        sys.front = 10
+        let s = make()
+        s.doAction(.leftHalf, wholeApp: false, nextScreen: false)
+        await waitUntil { !self.alerts.isEmpty && s.snapInFlight.isEmpty }
+        XCTAssertEqual(sys.setCount(1), 0)
+        XCTAssertEqual(alerts.first?.contains("full screen"), true, "\(alerts)")
+    }
 }

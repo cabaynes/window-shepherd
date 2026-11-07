@@ -179,13 +179,16 @@ public final class Shepherd {
         let landing = self.landing, clock = landingClock
         if !sel.retry { retryOffer = nil }   // a new move replaces the old offer
 
+        var inFullScreen = false   // a snap's window was in full screen: say that instead
         func finish(_ problem: JobProblem?) {
             defer { if problem != .interrupted { then?() } }
             tally.settle()
             let total = tally.moved
             let refused = tally.refused.values.reduce(0) { $0 + $1.count }
             // Keyboard single-window moves stay silent (like Rectangle) unless something went wrong.
-            if !sel.quiet || !tally.skipped.isEmpty || problem != nil || total == 0 || refused > 0 {
+            if inFullScreen {
+                alert("That window is in full screen, so Window Shepherd leaves it where it is")
+            } else if !sel.quiet || !tally.skipped.isEmpty || problem != nil || total == 0 || refused > 0 {
                 alert(reportText("Moved \(total) window\(total == 1 ? "" : "s") → \(label)",
                                  skipped: tally.skipped, hasMissed: !tally.missed.isEmpty, problem: problem, refused: refused))
             }
@@ -227,6 +230,7 @@ public final class Shepherd {
                     let focused = f.flatMap { $0.windowID }.flatMap { id in wins.first { $0.windowID == id } }
                     guard let target = focused ?? wins.first(where: { $0.windowID == winId }) ?? f,
                           let frame = target.frame() ?? cgFrame else { return .noAnswer }
+                    if target.isFullScreen { return .fullScreen }
                     guard let r = placer.frame(for: frame, screens: screens, main: main) else { return .nothingToDo }
                     guard (try? target.setFrame(r)) != nil else { return .refused }
                     let id = target.windowID
@@ -255,6 +259,8 @@ public final class Shepherd {
                     }
                 case .nothingToDo:
                     break
+                case .fullScreen:   // its own Space: left alone, and said why (not "Moved 0 windows")
+                    inFullScreen = true
                 }
                 finish(nil)
             }
@@ -283,7 +289,7 @@ public final class Shepherd {
 
     /// How a keyboard snap went: moved (its window id, if readable), the app didn't answer
     /// (no window or frame read), it refused the move, or the placer had nothing to do.
-    enum SnapOutcome { case moved(UInt32?), noAnswer, refused, nothingToDo }
+    enum SnapOutcome { case moved(UInt32?), noAnswer, refused, nothingToDo, fullScreen }
 
     /// At most one snap per app in flight; a newer press replaces any waiting one.
     func runSnap(_ pid: pid_t, _ work: @escaping @MainActor () async -> Void) {

@@ -310,6 +310,11 @@ extension Shepherd {
                            let w = self.system.visibleWindows().first(where: { String($0.id) == t.id }) {
                             self.recordSpot(w, key: key, screens: screens)
                         }
+                    },
+                    onFullScreen: { [weak self] id in   // left alone on purpose: not left behind
+                        guard let self else { return }
+                        self.book.restoredIds.insert(String(id))
+                        self.book.homeless.remove(String(id))
                     })
         }
         let label = Screens.setupLabel(screens)

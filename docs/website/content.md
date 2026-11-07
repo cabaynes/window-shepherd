@@ -211,7 +211,7 @@ Checked against `main` at 9191ace and the parity checklist (all 37 lines live-te
   - After an app relaunch or a restart, each app's windows go back to that app's usual spots; which page lands in which window may differ. **[verify at release]**
   - **First visit to a new monitor:** nothing to restore yet.
   - **Sleep, wake and the lid:** there's no special handling. The 2 s check notices the new setup after wake, so it should work. **[verify at release]**
-  - **Three or more displays, native full-screen windows, Stage Manager, Sidecar/AirPlay, docks and hubs:** untested. **[verify at release]**
+  - **Three or more displays, native full-screen windows, Stage Manager, Sidecar/AirPlay, docks and hubs:** untested on real hardware. **[verify at release]** Since 2026-11-07 the code leaves native full-screen windows alone (moves, restores and new-window placement skip them; a key pressed on one says so), and unit tests cover three screens (unplug one of three and back). Neither is checked live yet.
 
 ### 5.2 Moves
 
@@ -381,7 +381,7 @@ Never claim to be the only one.
 8. **Why does it need Accessibility permission?** Use the "How to start" reassurance text (4.4).
 9. **Will it slow my Mac down?** I built it so a frozen app can't hold it up, and its only background work is a light check every 2 seconds. (Add the idle CPU figure once measured.)
 10. **Can I move just some of my Chrome windows?** Not as a group. It moves one window, or every window of an app. Move the others one at a time with a shortcut.
-11. **What about other desktops (Spaces), full screen apps, Stage Manager or Zoom?** Moves work on the windows you can see. Windows on other desktops are left where they are, and Zoom's floating controls are never moved. Full-screen apps and Stage Manager haven't been tested yet. **[verify at release]**
+11. **What about other desktops (Spaces), full screen apps, Stage Manager or Zoom?** Moves work on the windows you can see. Windows on other desktops are left where they are, and Zoom's floating controls are never moved. Windows in full screen are left alone. Stage Manager hasn't been tested yet. **[verify at release: full screen live]**
 12. **Does it work with two identical monitors, docks or three monitors?** **[verify at release]** for each before answering yes. The honest answer today: "Screens are numbered 1 for the laptop, then left to right. I've only tested it with one monitor so far."
 13. **Does it work on an ultrawide?** Yes, though halves on an ultrawide are big and there are no thirds. Rectangle is better for that.
 14. **Which Macs does it run on?** macOS 14 Sonoma or later, on Apple Silicon or Intel. **[verify at release: run once on an Intel Mac]**

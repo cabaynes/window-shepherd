@@ -151,6 +151,41 @@ final class ShepherdRestoreTests: XCTestCase {
         XCTAssertNil(s.frozenStore.load().copies[dual]?.layout["2"], "and on disk")
     }
 
+    /// A window you put in native full screen while undocked is left alone at replug: not
+    /// moved, not "left behind" (no flashing).
+    func testReplugLeavesAFullScreenWindowAlone() async {
+        let s = await rememberedThenUnplugged()
+        sys.fullScreen = [2]
+        sys.allScreens = [lap, dell]
+        s.tick()
+        await waitUntil(4) { !s.isBusy && s.pendingPasses == 0 }
+        XCTAssertEqual(sys.frameOf(1)?.minX ?? 0, 1100, accuracy: 0.5, "the other window went home")
+        XCTAssertEqual(sys.setCount(2), 0)
+        XCTAssertFalse(s.book.leftBehind.contains("2"))
+        XCTAssertFalse(s.flashing)
+    }
+
+    /// Three screens: unplug the middle monitor, plug it back in; each window goes home,
+    /// including the one that was on the screen that came back.
+    func testThreeScreensUnplugOneAndBack() async {
+        let left = screen(3, "LG", x: -1000)
+        sys.allScreens = [lap, dell, left]
+        sys.addApp(10, "Safari", windows: [(1, rect(1100)), (2, rect(-900)), (3, rect(100))])
+        let s = make()
+        s.tick()
+        sys.allScreens = [lap, left]                       // the Dell goes
+        move(1, to: rect(200))                             // macOS piles its window onto the laptop
+        s.screensChanged()
+        await waitUntil(4) { !s.isBusy && s.pendingPasses == 0 }
+        XCTAssertEqual(sys.frameOf(2), rect(-900), "the LG window stays")
+        sys.allScreens = [lap, dell, left]
+        s.tick()
+        await waitUntil(4) { !s.isBusy && s.pendingPasses == 0 }
+        XCTAssertEqual(sys.frameOf(1)?.minX ?? 0, 1100, accuracy: 0.5, "back on the Dell")
+        XCTAssertEqual(sys.frameOf(2), rect(-900))
+        XCTAssertEqual(sys.frameOf(3), rect(100))
+    }
+
     func testRestoreLeavesUnmovedVisibleWindowsLeftBehind() async {
         let s = await rememberedThenUnplugged()
         sys.failSet = [1]

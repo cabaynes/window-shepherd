@@ -14,6 +14,7 @@ final class FakeWindowSystem: WindowSystem {
         func frame() -> CGRect? { sys.locked { sys.noFrame.contains(id) ? nil : sys.windowsByID[id]?.frame } }
         var isStandard: Bool? { sys.locked { sys.unreadableKind.contains(id) ? nil : !sys.nonStandard.contains(id) } }
         var title: String? { sys.locked { sys.axTitles[id] } }
+        var isFullScreen: Bool { sys.locked { sys.fullScreen.contains(id) } }
         var hasFullScreenButton: Bool { sys.locked { !sys.noFullScreenButton.contains(id) } }
         var isResizable: Bool { sys.locked { !sys.fixedSize.contains(id) } }
         func setFrame(_ r: CGRect) throws {
@@ -79,6 +80,7 @@ final class FakeWindowSystem: WindowSystem {
     var offSpace: Set<UInt32> = []
     var mouseUsed: Date?                         // the last left-button press or drag
     var mouseDragged: Date?                      // the last left-button drag
+    var fullScreen: Set<UInt32> = []             // in native full screen (its own Space)
     var axTitles: [UInt32: String] = [:]         // titles the app reports (Accessibility)
     var allIDsReads = 0                          // full window-list reads (.optionAll: costly)
     var enhancedUI: Set<pid_t> = []              // apps with AXEnhancedUserInterface on (Chrome under assistive tools)
