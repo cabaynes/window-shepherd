@@ -190,7 +190,9 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
         // Right tab stop for the keys, past the widest title in this menu.
         let widest = nodes.map { node -> CGFloat in
             switch node {
-            case let .item(t, _, _, _), let .submenu(t, _, _): return (t as NSString).size(withAttributes: [.font: font]).width
+            case let .item(t, k, _, indent):   // an indented row with keys is indented inside its text
+                return (t as NSString).size(withAttributes: [.font: font]).width + (k == nil ? 0 : Self.indentStep * CGFloat(indent))
+            case let .submenu(t, _, _): return (t as NSString).size(withAttributes: [.font: font]).width
             default: return 0
             }
         }.max() ?? 0
@@ -218,8 +220,13 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
                 let mi = NSMenuItem(title: title, action: #selector(clicked(_:)), keyEquivalent: "")
                 mi.target = self
                 mi.representedObject = ActionBox(action)
-                mi.indentationLevel = indent
-                if let keys { mi.attributedTitle = withKeys(title, keys, tabAt: tabAt, font: font) }
+                if let keys {
+                    // Indented inside the text, not with indentationLevel: that shifts the whole row,
+                    // tab stops included, so its keys would sit right of everyone else's.
+                    mi.attributedTitle = withKeys(title, keys, tabAt: tabAt, font: font, indent: indent)
+                } else {
+                    mi.indentationLevel = indent
+                }
                 menu.addItem(mi)
             case let .submenu(title, keys, children):
                 let mi = NSMenuItem(title: title, action: nil, keyEquivalent: "")
@@ -261,8 +268,12 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
         }
     }
 
-    private func withKeys(_ title: String, _ keys: String, tabAt: CGFloat, font: NSFont) -> NSAttributedString {
+    /// How far one level of indentation moves a row's text.
+    static let indentStep: CGFloat = 16
+
+    private func withKeys(_ title: String, _ keys: String, tabAt: CGFloat, font: NSFont, indent: Int = 0) -> NSAttributedString {
         let para = NSMutableParagraphStyle()
+        para.firstLineHeadIndent = Self.indentStep * CGFloat(indent)
         para.tabStops = [NSTextTab(textAlignment: .right, location: tabAt)]
         let s = NSMutableAttributedString(string: title + "\t" + keys, attributes: [.font: font, .paragraphStyle: para])
         return s
