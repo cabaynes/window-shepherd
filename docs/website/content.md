@@ -147,7 +147,7 @@ Screenshot: the menu, opened with the mouse, with the 90% submenu showing "This 
 
 Optional, a short expandable "All the shortcuts" list (section 5.4), or a link to the README for it.
 
-### 4.3 The story (about 120 words) **[Charles?]**
+### 4.3 The story (about 120 words). Approved 2026-11-07, with the AI line, "used it every day since [month]" and a cccccccharles.github.io link; no photo
 
 > Hi, I'm Charles. I've used Rectangle for years and I love it. But I always have several windows of the same app open, like Chrome or VS Code, and I needed a quick way to organize and move them together. I also move between a few different monitor setups, and my Mac would often forget where everything went, so I'd move it all back by hand. So I built something for myself, first as a small script and now as a proper Mac app. I think of it as a supplement to Rectangle: it does the things I wished Rectangle did, and skips the parts I didn't personally use. I thought it might help someone else too.
 
@@ -389,7 +389,7 @@ Never claim to be the only one.
 15. **Is my data collected?** No. Nothing leaves your Mac except the update check. Link PRIVACY.md.
 16. **Aren't there other apps that do this?** Use the 6.2 wording.
 17. **How do I uninstall it?** Quit it from the menu and drag it to the Trash (see 5.9 for removing everything).
-18. **How do I report a bug or suggest something?** GitHub Issues. **[Charles?]** Add an email address too?
+18. **How do I report a bug or suggest something?** GitHub Issues (settled 2026-11-07: no email address at launch).
 
 ---
 
@@ -495,13 +495,14 @@ Never claim to be the only one.
 ## 11. Decisions for Charles
 
 Settled 2026-10-24: the headline (Charles's own), the "different monitor setups" wording (4.1), and the Chrome/VS Code line (4.2).
+Settled 2026-11-07 (Charles accepted Claude's recommendations): items 1, 3 and 4 below, as recommended. Only the "used it every day since [month]" month is still to fill in.
 
-1. The story: approve the rewritten version (4.3). Decide on the optional lines: the AI line, "used it every day since…", photo, link.
+1. ~~The story: approve the rewritten version (4.3). Decide on the optional lines: the AI line, "used it every day since…", photo, link.~~ Settled 2026-11-07: approved, with the AI line, "used it every day since [month]", no photo, a cccccccharles.github.io link.
    Claude's recommendation (2026-11-07): approve it; keep the AI line (honest, one sentence, and it's what a portfolio reader will ask); keep "used it every day since…" with the month the Hammerspoon version started; no photo (the page is about the windows); link to cccccccharles.github.io rather than LinkedIn.
 2. ~~Intel support: build universal, or say Apple Silicon only.~~ Settled 2026-11-07: universal.
-3. The bug-report channel: GitHub Issues only, or an email address too.
+3. ~~The bug-report channel: GitHub Issues only, or an email address too.~~ Settled 2026-11-07: GitHub Issues only.
    Claude's recommendation: GitHub Issues only at launch. An address gets spam and needs answering privately; Issues are public, so one report helps everyone with the same problem. Add an address later if people without GitHub accounts ask.
-4. Whether to show the shortcut table on the page (expandable) or only link to the README.
+4. ~~Whether to show the shortcut table on the page (expandable) or only link to the README.~~ Settled 2026-11-07: link to the README.
    Claude's recommendation: link to the README. The agreed direction (section 3) is a short page with the detail in the README, and one table to keep current is easier than two.
 
 ---
