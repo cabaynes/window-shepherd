@@ -44,6 +44,8 @@ private struct Clash: Hashable {
 
 struct SettingsView: View {
     @ObservedObject var model: SettingsModel
+    /// Rows whose folded "⚠ N potential conflicts" line is open.
+    @State private var openWarnings: Set<String> = []
     var height: CGFloat = 780
     private var flow: SettingsFlow { model.flow }
 
@@ -272,7 +274,33 @@ struct SettingsView: View {
                 })
             }
         } else if !clashes.isEmpty {
-            clashBoxes(clashes)
+            foldedClashes(entry: entry, clashes)
+        }
+    }
+
+    /// A saved shortcut's clashes: red blocks and Rectangle's keys stay in view; other apps'
+    /// shortcuts (mostly harmless: yours wins) fold into one "⚠ N potential conflicts" line
+    /// that opens on click, so the window doesn't look alarming.
+    private func foldedClashes(entry: Entry, _ clashes: [Clash]) -> some View {
+        let warns = clashes.filter { $0.level == .warn }, rest = clashes.filter { $0.level != .warn }
+        let open = openWarnings.contains(entry.key)
+        let wins = warns.contains { $0.text.hasSuffix(" Yours will win.") }
+        let label = "⚠ \(warns.count) potential conflict\(warns.count == 1 ? "" : "s")"
+            + (wins ? " (Window Shepherd wins)" : "") + (open ? "  ▾" : "  ▸")
+        return VStack(alignment: .leading, spacing: 6) {
+            if !rest.isEmpty { clashBoxes(rest) }
+            if !warns.isEmpty {
+                Button {
+                    if open { openWarnings.remove(entry.key) } else { openWarnings.insert(entry.key) }
+                } label: {
+                    Text(label).foregroundStyle(Palette.amber).contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .font(listFont)
+                .help(open ? "Hide them" : "Show which apps use the same keys")
+                .padding(.leading, 160)
+                if open { clashBox(warns) }
+            }
         }
     }
 
