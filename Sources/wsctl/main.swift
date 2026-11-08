@@ -10,7 +10,7 @@ let args = Array(CommandLine.arguments.dropFirst())
 func fmt(_ r: CGRect) -> String { String(format: "%.0f %.0f %.0f %.0f", r.minX, r.minY, r.width, r.height) }
 
 func usage() -> Never {
-    print("usage: wsctl screens | windows | front [seconds] | move <id> <x> <y> <w> <h> | scan | check <id|title> <n|own> <x y w h|center|default>")
+    print("usage: wsctl screens | windows | front [seconds] | cg <app name> | move <id> <x> <y> <w> <h> | scan | check <id|title> <n|own> <x y w h|center|default>")
     exit(2)
 }
 
@@ -20,6 +20,20 @@ func handle(for id: UInt32) -> WindowHandle? {
 }
 
 switch args.first {
+case "cg":   // every CoreGraphics window of an app, on screen or not: what macOS itself reports (no AX)
+    guard args.count >= 2 else { usage() }
+    let app = args.dropFirst().joined(separator: " ")
+    let all = CGWindowListCopyWindowInfo([.optionAll], kCGNullWindowID) as? [[String: Any]] ?? []
+    let mine = all.filter { ($0[kCGWindowOwnerName as String] as? String) == app }
+    print("\(app): \(mine.count) CoreGraphics windows, front to back (\(Date()))")
+    print("id\tlayer\ton screen\talpha\tsharing\tx y w h")
+    for w in mine {
+        let b = w[kCGWindowBounds as String] as? [String: CGFloat] ?? [:]
+        let r = CGRect(x: b["X"] ?? 0, y: b["Y"] ?? 0, width: b["Width"] ?? 0, height: b["Height"] ?? 0)
+        print("\(w[kCGWindowNumber as String] ?? "?")\t\(w[kCGWindowLayer as String] ?? "?")\t"
+              + "\((w[kCGWindowIsOnscreen as String] as? Bool) == true ? "yes" : "no")\t"
+              + "\(w[kCGWindowAlpha as String] ?? "?")\t\(w[kCGWindowSharingState as String] ?? "?")\t\(fmt(r))")
+    }
 case "screens":
     for d in Screens.destinations(system.screens()) {
         print("\(d.num)\t\(d.name)\t\(d.screen.uuid)\tframe \(fmt(d.screen.frame))\tfull \(fmt(d.screen.full))")
