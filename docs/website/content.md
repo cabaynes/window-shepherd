@@ -191,6 +191,7 @@ Credit line in the footer: "The halves, full screen and center keys follow the S
 > **Free and open.** No trial, no account. Anyone can read how it's made on GitHub.
 
 Measure before claiming any CPU or battery figure: idle CPU in Activity Monitor over a few minutes. **[verify at release]** If it's tiny, add it: "On my MacBook it uses about X% CPU when idle."
+Real use so far (the app's log, 2026-10-19 to 11-07): about 100 unplug/replug cycles between the laptop alone and laptop + DELL U2718Q, 207 restore passes. Never seen: the lid closed at the desk (the Dell alone), any other monitor. Wakes weren't logged until 2026-11-07 ("Mac woke from sleep"), so sleep/wake can be checked from the log from now on.
 First measurement, 2026-11-07 (Debug build, Charles's MacBook Air, docked, about 35 windows remembered, 65 s with `top` every 5 s): **0.0–0.1% CPU, 11 MB memory (26 MB resident), 3 threads.** Repeat on the release build before quoting it; a release build should be no heavier.
 
 ---

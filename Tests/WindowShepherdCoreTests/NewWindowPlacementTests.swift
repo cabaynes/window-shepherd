@@ -113,6 +113,13 @@ final class NewWindowPlacementTests: XCTestCase {
         await waitUntil { !s.isBusy }
     }
 
+    /// A wake is logged, so a restore after sleep can be told apart in the log.
+    func testWakeIsLogged() {
+        let s = make()
+        s.didWake()
+        XCTAssertTrue(log().contains("Mac woke from sleep"), log())
+    }
+
     func testNewWindowMidDayAlsoPlaced() async {
         addApp(10, "Safari", windows: [(1, rect(150))])
         let s = make()

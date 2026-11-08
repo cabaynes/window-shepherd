@@ -7,7 +7,10 @@ extension Shepherd {
     static let lastRecordedFor: Double = 10
 
     /// The Mac woke from sleep: for a while, windows that move are macOS's doing.
-    public func didWake() { wokeAt = nowSeconds }
+    public func didWake() {
+        wokeAt = nowSeconds
+        Log.info("Mac woke from sleep")   // so a restore right after a wake can be told apart in the log
+    }
 
     /// Shortly after the app launched, a screen change or a wake, a window that
     /// moves is likely macOS's or the app's guess, not yours. Cheap: no app calls.
