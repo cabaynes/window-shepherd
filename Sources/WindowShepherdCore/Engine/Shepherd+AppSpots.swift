@@ -208,6 +208,7 @@ extension Shepherd {
         }
         var plan: [pid_t: [UInt32: RestoreTarget]] = [:]
         var apps: [UInt32: String] = [:]
+        var sizes: [UInt32: CGSize] = [:]   // the size it opened at, logged (a small pop-up made big shows here)
         for (bundle, ws) in byBundle.sorted(by: { $0.key < $1.key }) {
             let got = spots.assign(key: key, bundle: bundle, windows: ws.map { (String($0.id), Geometry.whereIs($0.frame, in: screens)) },
                                    now: nowSeconds)
@@ -216,6 +217,7 @@ extension Shepherd {
                 plan[w.pid, default: [:]][w.id] = RestoreTarget(id: String(w.id), screenUUID: spot.scr, unit: spot.unit,
                                                                 from: Geometry.whereIs(w.frame, in: screens))
                 apps[w.id] = w.app
+                sizes[w.id] = w.frame.size
             }
         }
         guard !plan.isEmpty else { return }
@@ -251,7 +253,8 @@ extension Shepherd {
                         let launched = self.system.launchDate(pid: pid)
                         let atLaunch = launched.map { self.now().timeIntervalSince($0) < self.restoreTiming.guessing } == true
                         let why = atLaunch ? "opened at launch" : "new window"
-                        Log.info("\(apps[id] ?? "?") window \(id) → its spot on \(name) (\(Self.unitLabel(t.unit))), \(why)")
+                        let was = sizes[id].map { ", was \(Int($0.width.rounded()))×\(Int($0.height.rounded()))" } ?? ""
+                        Log.info("\(apps[id] ?? "?") window \(id) → its spot on \(name) (\(Self.unitLabel(t.unit))), \(why)\(was)")
                     },
                     onFullScreen: { [weak self] id in self?.releasePlacing(String(id)) })
         }

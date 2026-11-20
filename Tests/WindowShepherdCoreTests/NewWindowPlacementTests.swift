@@ -97,6 +97,7 @@ final class NewWindowPlacementTests: XCTestCase {
         XCTAssertEqual(spots(s, "Safari").count, 1, "its spot is held, not added again")
         XCTAssertTrue(s.spots.holds(key: key, window: "5"))
         XCTAssertTrue(log().contains("Safari window 5 → its spot on DELL (90% centered), opened at launch"), log())
+        XCTAssertTrue(log().contains("opened at launch, was 400×300"), "the size it opened at, to spot pop-ups made big: \(log())")
     }
 
     /// The tick that places a new window (and saves) reads the full window list once.
