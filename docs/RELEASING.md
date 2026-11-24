@@ -52,8 +52,8 @@ Notarization uploads each build to Apple for an automatic malware check.
    ```
 
    The public key isn't secret, so commit that change. Back up the private key with `vendor/Sparkle/bin/generate_keys -x sparkle-private-key.txt` and keep that file somewhere safe outside the repo (`.gitignore` blocks `sparkle_private_key*` names, but don't rely on it). If you lose the private key, existing users can't receive updates.
-2. **GitHub Pages** (serves the update feed). On github.com/cabaynes/window-shepherd go to **Settings → Pages**. Set Source to "Deploy from a branch", branch `main`, folder `/docs`, and save. The feed will be at https://cabaynes.github.io/window-shepherd/appcast.xml.
-3. **windowshepherd.com.** Until the website exists, point the domain at the repo. In Squarespace → Domains → windowshepherd.com → **Domain forwarding**, forward to `https://github.com/cabaynes/window-shepherd`.
+2. **GitHub Pages** (serves the website and the update feed). Already set up (2026-11-24): `.github/workflows/pages.yml` publishes the `site/` folder on every push to `main` that touches it, to https://windowshepherd.com. The feed goes in `site/appcast.xml`, so it's served at https://windowshepherd.com/appcast.xml, the address in the app's `Info.plist` (`SUFeedURL`).
+3. **windowshepherd.com.** Points at GitHub Pages (Squarespace DNS: four A records and a `www` CNAME, set up 2026-11-24). Nothing to do here.
 4. **Homebrew tap.** Create a public repo named `homebrew-tap` under cabaynes. Then `brew install --cask cabaynes/tap/window-shepherd` works once `Casks/window-shepherd.rb` is in it (step 5.5).
 
 ## 5. Make a release (every time)
@@ -67,8 +67,9 @@ Notarization uploads each build to Apple for an automatic malware check.
 
    This takes a few minutes, mostly waiting for Apple. It prints the DMG's path and SHA-256.
 3. On GitHub, go to **Releases → Draft a new release**. Use tag `v0.1.0`, paste the changelog section, attach `dist/Window-Shepherd-0.1.0.dmg`, and publish.
-4. Update the feed: `scripts/make-appcast.sh dist/Window-Shepherd-0.1.0.dmg 0.1.0`, then commit and push `docs/appcast.xml`. Existing users see the update within a day, or at once via **Check for Updates…**
+4. Update the feed: `scripts/make-appcast.sh dist/Window-Shepherd-0.1.0.dmg 0.1.0`, then commit and push `site/appcast.xml` (the Website workflow publishes it). Existing users see the update within a day, or at once via **Check for Updates…**
 5. Homebrew: copy `packaging/window-shepherd.rb` to `Casks/window-shepherd.rb` in the `homebrew-tap` repo, set `version` and `sha256` from step 2, and push.
+6. Website (first release only): in `site/index.html`, point `#get` at the DMG on GitHub Releases, change its text to "Download Window Shepherd", replace the "Coming soon" note with "Signed and checked by Apple", and update the `coming-soon button` check in `site/tests/check-page.cjs` to match. Run `node site/tests/check-page.cjs`, then push.
 
 ## Checking a release
 

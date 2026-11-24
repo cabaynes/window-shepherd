@@ -29,7 +29,7 @@
 	<key>NSHumanReadableCopyright</key>
 	<string>© 2026 Charles Baynes. Free and open source (MIT).</string>
 	<key>SUFeedURL</key>
-	<string>https://cabaynes.github.io/window-shepherd/appcast.xml</string>
+	<string>https://windowshepherd.com/appcast.xml</string>
 	<key>SUPublicEDKey</key>
 	<string>$(SPARKLE_PUBLIC_KEY)</string>
 	<key>SUEnableInstallerLauncherService</key>
