@@ -205,6 +205,36 @@ checks.push({ name: 'reduced motion: no autoplay, moves are instant', per: 'once
   return !where(ps) || 'not instant: ' + where(ps);
 }});
 
+// ---------- icons and link preview ----------
+checks.push({ name: 'icons exist', per: 'once', run: async ({ open }) => {
+  const { page, ctx } = await open(noAutoplay);
+  const hrefs = await page.evaluate(() => [...document.querySelectorAll('link[rel~="icon"], link[rel="apple-touch-icon"]')].map(l => l.href));
+  const bad = [];
+  for (const h of [...hrefs, new URL('/favicon.ico', page.url()).href]) {
+    const r = await page.request.get(h);
+    if (r.status() !== 200 || !/^image\//.test(r.headers()['content-type'] || '')) bad.push(`${h} ${r.status()} ${r.headers()['content-type']}`);
+  }
+  await ctx.close();
+  if (hrefs.length < 3) return `only ${hrefs.length} icon links`;
+  return bad.length === 0 || bad.join(', ');
+}});
+
+checks.push({ name: 'link preview card', per: 'once', run: async ({ open }) => {
+  const { page, ctx } = await open(noAutoplay);
+  const og = await page.evaluate(() => Object.fromEntries([...document.querySelectorAll('meta[property^="og:"], meta[name^="twitter:"]')]
+    .map(m => [m.getAttribute('property') || m.getAttribute('name'), m.content])));
+  const img = og['og:image'] || '';
+  let size = null;
+  if (img) {
+    const local = new URL(new URL(img).pathname, page.url()).href;   // check the file this site serves
+    size = await page.evaluate(async src => { const i = new Image(); i.src = src; await i.decode(); return [i.naturalWidth, i.naturalHeight]; }, local);
+  }
+  await ctx.close();
+  if (!img.startsWith('https://windowshepherd.com/')) return 'og:image not absolute: ' + img;
+  if (!og['og:title'] || !og['og:description'] || og['twitter:card'] !== 'summary_large_image') return JSON.stringify(og);
+  return (size && size[0] === 1200 && size[1] === 630) || 'og.png size ' + size;
+}});
+
 module.exports = { checks };
 
 async function serve() {
