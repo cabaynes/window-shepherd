@@ -621,6 +621,60 @@ final class NewWindowPlacementTests: XCTestCase {
         XCTAssertEqual(sys.frameOf(5), dell90)
     }
 
+    static let chrome = "com.google.Chrome"
+
+    /// Chrome's profile picker ("Who's using Chrome?") is standard, has the green button and is
+    /// resizable, like a browser window; only its title lacks "Google Chrome" (live, 2026-11-24).
+    func testChromeProfilePickerIsNeverPlaced() async {
+        let s = make()
+        seedFreeSpot(s, ninety, on: dell, bundle: Self.chrome)
+        sys.axTitles[5] = "Who's using Chrome?"
+        addApp(40, "Google Chrome", windows: [(5, rect(100))], bundle: Self.chrome)
+        await settle(s, 5)
+        s.tick()
+        await waitUntil { !s.isBusy }
+        XCTAssertEqual(s.isMainWindow("5"), false)
+        XCTAssertEqual(sys.frameOf(5), rect(100))
+        XCTAssertEqual(sys.setCount(5), 0)
+        XCTAssertFalse(s.spots.holds(key: key, window: "5"))
+    }
+
+    /// A Chrome browser window (its title names Google Chrome) is placed.
+    func testChromeBrowserWindowIsPlaced() async {
+        let s = make()
+        seedFreeSpot(s, ninety, on: dell, bundle: Self.chrome)
+        sys.axTitles[5] = "New Tab - Google Chrome - SakeBomb"
+        addApp(40, "Google Chrome", windows: [(5, rect(100))], bundle: Self.chrome)
+        await settle(s, 5)
+        XCTAssertEqual(s.isMainWindow("5"), true)
+        XCTAssertEqual(sys.frameOf(5), dell90)
+    }
+
+    /// A Chrome window with no title yet is asked again, not taken for a pop-up for good.
+    func testChromeWindowWithNoTitleYetIsAskedAgain() async {
+        let s = make()
+        seedFreeSpot(s, ninety, on: dell, bundle: Self.chrome)
+        addApp(40, "Google Chrome", windows: [(5, rect(100))], bundle: Self.chrome)
+        sys.locked { sys.axTitles[5] = "" }
+        s.tick()
+        await waitUntil { s.kindsInFlight.isEmpty }
+        XCTAssertNil(s.isMainWindow("5"), "not known yet")
+        sys.locked { sys.axTitles[5] = "New Tab - Google Chrome" }
+        s.tick()
+        await waitUntil { s.kindsInFlight.isEmpty && s.isMainWindow("5") != nil }
+        XCTAssertEqual(s.isMainWindow("5"), true)
+    }
+
+    /// The title rule is Chrome's only: another app's window titled without its app name is placed.
+    func testOtherAppsWindowWithoutAppNameInTitleIsStillPlaced() async {
+        let s = make()
+        seedFreeSpot(s, ninety, on: dell)
+        sys.axTitles[5] = "Who's using Safari?"
+        addApp(10, "Safari", windows: [(5, rect(100))], ago: 1)
+        await settle(s, 5)
+        XCTAssertEqual(sys.frameOf(5), dell90)
+    }
+
     func testUnitLabel() {
         XCTAssertEqual(Shepherd.unitLabel(ninety), "90% centered")
         XCTAssertEqual(Shepherd.unitLabel(full), "Full screen")

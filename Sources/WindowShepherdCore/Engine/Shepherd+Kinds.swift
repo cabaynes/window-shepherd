@@ -8,6 +8,18 @@ extension Shepherd {
     /// Finder's Get Info panel is a standard window with no green full-screen button. Only
     /// Finder: other apps' real windows can lack it too (Photoshop documents).
     static let panelsWithoutFullScreenButton: Set<String> = ["com.apple.finder"]
+    /// Apps whose main windows' titles always carry the app's name. Chrome's profile picker
+    /// ("Who's using Chrome?") is standard, has the green button and is resizable like a browser
+    /// window; only its title tells it apart (live, 2026-11-24). Undocked DevTools ("DevTools - …")
+    /// count as pop-ups too.
+    static let mainWindowTitleMarks: [String: String] = ["com.google.Chrome": "Google Chrome"]
+
+    /// A standard window's kind from its title, for apps in `mainWindowTitleMarks`.
+    /// nil = no title yet (a new window): ask again.
+    static func kindFromTitle(_ title: String?, mark: String) -> Bool? {
+        guard let title, !title.isEmpty else { return nil }
+        return title.contains(mark)
+    }
 
     /// Is this a main window? nil = not learned yet.
     public func isMainWindow(_ id: String) -> Bool? { kinds[id] }
@@ -22,7 +34,9 @@ extension Shepherd {
             kindsInFlight.insert(pid)
             let system = self.system
             let worker = kindWorker
-            let checkButton = system.bundleID(pid: pid).map(Self.panelsWithoutFullScreenButton.contains) == true
+            let bundle = system.bundleID(pid: pid)
+            let checkButton = bundle.map(Self.panelsWithoutFullScreenButton.contains) == true
+            let titleMark = bundle.flatMap { Self.mainWindowTitleMarks[$0] }
             Task { @MainActor [weak self] in
                 let answers: (kinds: [UInt32: Bool?], complete: Bool)? = await worker.run {
                     // A failed or timed-out list says nothing about the windows: record nothing.
@@ -33,7 +47,11 @@ extension Shepherd {
                         guard let id = h.windowID else { complete = false; continue }
                         guard ids.contains(id) else { continue }
                         let standard = h.isStandard
-                        out[id] = standard == true && checkButton ? h.hasFullScreenButton : standard
+                        if standard == true, let titleMark {
+                            out[id] = Self.kindFromTitle(h.title, mark: titleMark)
+                        } else {
+                            out[id] = standard == true && checkButton ? h.hasFullScreenButton : standard
+                        }
                     }
                     return (out, complete)
                 }

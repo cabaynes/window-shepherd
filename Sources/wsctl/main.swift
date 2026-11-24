@@ -10,7 +10,7 @@ let args = Array(CommandLine.arguments.dropFirst())
 func fmt(_ r: CGRect) -> String { String(format: "%.0f %.0f %.0f %.0f", r.minX, r.minY, r.width, r.height) }
 
 func usage() -> Never {
-    print("usage: wsctl screens | windows | front [seconds] | cg <app name> | move <id> <x> <y> <w> <h> | scan | check <id|title> <n|own> <x y w h|center|default>")
+    print("usage: wsctl screens | windows | front [seconds] | ax [seconds] | cg <app name> | move <id> <x> <y> <w> <h> | scan | check <id|title> <n|own> <x y w h|center|default>")
     exit(2)
 }
 
@@ -33,6 +33,17 @@ case "cg":   // every CoreGraphics window of an app, on screen or not: what macO
         print("\(w[kCGWindowNumber as String] ?? "?")\t\(w[kCGWindowLayer as String] ?? "?")\t"
               + "\((w[kCGWindowIsOnscreen as String] as? Bool) == true ? "yes" : "no")\t"
               + "\(w[kCGWindowAlpha as String] ?? "?")\t\(w[kCGWindowSharingState as String] ?? "?")\t\(fmt(r))")
+    }
+case "ax":   // after a pause: what Accessibility says about each of the front app's windows (tells pop-ups from real windows)
+    Thread.sleep(forTimeInterval: Double(args.dropFirst().first ?? "") ?? 5)
+    guard let pid = system.frontmostPID() else { print("no front app"); exit(1) }
+    print("front app: \(system.appName(pid: pid) ?? "?")  (\(Date()))")
+    guard let wins = try? system.appWindows(pid: pid) else { print("  not readable (give this terminal Accessibility)"); exit(1) }
+    print("id\tstandard\tfull-screen button\tresizable\tx y w h\ttitle")
+    func yn(_ b: Bool?) -> String { b.map { $0 ? "yes" : "no" } ?? "no answer" }
+    for w in wins {
+        print("\(w.windowID.map(String.init) ?? "?")\t\(yn(w.isStandard))\t\(yn(w.hasFullScreenButton))\t"
+              + "\(yn(w.isResizable))\t\(w.frame().map(fmt) ?? "?")\t\(w.title ?? "")")
     }
 case "screens":
     for d in Screens.destinations(system.screens()) {
