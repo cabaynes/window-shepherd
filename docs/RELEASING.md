@@ -53,7 +53,7 @@ Notarization uploads each build to Apple for an automatic malware check.
 
    The public key isn't secret, so commit that change. Back up the private key with `vendor/Sparkle/bin/generate_keys -x sparkle-private-key.txt` and keep that file somewhere safe outside the repo (`.gitignore` blocks `sparkle_private_key*` names, but don't rely on it). If you lose the private key, existing users can't receive updates.
 2. **GitHub Pages** (serves the website and the update feed). Already set up (2026-11-24): `.github/workflows/pages.yml` publishes the `site/` folder on every push to `main` that touches it, to https://windowshepherd.com. The feed goes in `site/appcast.xml`, so it's served at https://windowshepherd.com/appcast.xml, the address in the app's `Info.plist` (`SUFeedURL`).
-3. **windowshepherd.com.** Points at GitHub Pages (Squarespace DNS: four A records and a `www` CNAME, set up 2026-11-24). Nothing to do here.
+3. **windowshepherd.com.** In Squarespace → Domains → windowshepherd.com → DNS, remove any domain forwarding and add A records for `@` → 185.199.108.153, 185.199.109.153, 185.199.110.153, 185.199.111.153, and a CNAME `www` → `cabaynes.github.io`. Then in the repo, Settings → Pages → Custom domain: `windowshepherd.com`, and tick Enforce HTTPS once it's offered. Until then the site is at https://cabaynes.github.io/window-shepherd/.
 4. **Homebrew tap.** Create a public repo named `homebrew-tap` under cabaynes. Then `brew install --cask cabaynes/tap/window-shepherd` works once `Casks/window-shepherd.rb` is in it (step 5.5).
 
 ## 5. Make a release (every time)
