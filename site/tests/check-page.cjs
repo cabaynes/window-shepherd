@@ -205,6 +205,18 @@ checks.push({ name: 'reduced motion: no autoplay, moves are instant', per: 'once
   return !where(ps) || 'not instant: ' + where(ps);
 }});
 
+// Charles, 2026-11-24: the text above and below the demo runs at least as wide as the demo.
+checks.push({ name: 'text column as wide as the demo', per: 'viewport', run: async ({ page }) => {
+  const r = await page.evaluate(() => {
+    const w = sel => document.querySelector(sel).getBoundingClientRect();
+    const stage = w('[data-demo]');
+    return { stage: Math.round(stage.width), left: Math.round(stage.left),
+      cols: ['.lede', '#replug > p', '#faq', '.footer p'].map(sel => ({ sel, w: Math.round(w(sel).width), l: Math.round(w(sel).left) })) };
+  });
+  const narrow = r.cols.filter(c => c.w < r.stage - 1 || Math.abs(c.l - r.left) > 1);
+  return narrow.length === 0 || `demo ${r.stage}px at ${r.left}: ` + narrow.map(c => `${c.sel} ${c.w}px at ${c.l}`).join(', ');
+}});
+
 // ---------- icons and link preview ----------
 checks.push({ name: 'icons exist', per: 'once', run: async ({ open }) => {
   const { page, ctx } = await open(noAutoplay);
