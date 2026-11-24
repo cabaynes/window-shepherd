@@ -29,3 +29,6 @@ Config/Local.xcconfig
 .superpowers/
 vendor/
 dist/
+
+# Website page-check screenshots
+site/tests/.shots/

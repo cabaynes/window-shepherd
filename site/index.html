@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Window Shepherd — put your Mac's windows back</title>
+<meta name="description" content="A free Mac app. Quickly resize or maximize a single window, an entire app, or everything open, at once. It remembers where every window was for each multi-screen setup you use and puts them back when you plug in again.">
+<meta name="author" content="Charles Baynes">
+<link rel="canonical" href="https://windowshepherd.com/">
+<link rel="preload" href="fonts/bungee-shade.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header id="hero" class="hero">
+  <h1 class="wordmark">Window Shepherd</h1>
+  <p class="headline">Quickly tidy your app windows, move them between screens, and put it all back the way it was.</p>
+  <p class="lede">A free Mac app I built, mostly for myself. Quickly resize or maximize a single window, an entire app, or everything open, at once. It also remembers where every window was for each different multi-screen setup you use, puts them back when you plug in again, and can easily move windows between those screens with a single click.</p>
+  <div class="get">
+    <a id="get" class="button" data-state="soon" href="https://github.com/cabaynes/window-shepherd">Watch for the release on GitHub</a>
+    <p class="get-note"><strong>Coming soon.</strong> I'm waiting on Apple to sign the app. The code is on GitHub now, and you can watch the repo to hear when it's out.</p>
+    <p class="facts">Free · Open source · macOS 14 or later</p>
+  </div>
+</header>
+
+<section id="demo" class="demo" aria-label="Try it: unplug and plug in a monitor">
+  <div class="stage" data-demo></div>
+  <div class="controls"></div>
+  <p class="caption" aria-live="polite"></p>
+</section>
+
+<main>
+  <div class="prose intro">
+    <p>You don't have to learn any shortcuts. Once it's running, it puts your windows back by itself when you plug your external monitor in. If you'd like to move windows yourself, there's a small icon at the top of your screen, and keyboard shortcuts too if you like them.</p>
+    <p>If you use Rectangle, think of this as a supplement: it does the things I wished Rectangle did, and you can use both. <a href="#rectangle">How they fit together</a></p>
+  </div>
+
+  <section id="replug" class="prose">
+    <h2>Sit down, plug in, and everything's back</h2>
+    <p>I move between a few different monitor setups, and my Mac would often forget where my windows went, so I'd end up moving them back to my preferred spots by hand. Window Shepherd keeps a separate arrangement for each setup, and for the laptop on its own. When I plug in, my windows go back to how I left them on that setup, and when I unplug, the laptop goes back to how I had it.</p>
+    <ul>
+      <li>There's nothing to set up or save. It keeps track as you go.</li>
+      <li>If you move a window while it's putting things back, it leaves that one alone.</li>
+      <li>It keeps trying for about 20 seconds, because some apps are slow to wake up.</li>
+    </ul>
+    <p>macOS puts a few windows back on its own, but for me it was always hit and miss. Window Shepherd makes sure every window goes back to exactly where it was.</p>
+    <p>The first time you connect a new monitor, there's nothing to remember yet, so you arrange things once. After that, it remembers.</p>
+  </section>
+
+  <section id="tidy" class="prose">
+    <h2>One window, a whole app, or everything</h2>
+    <p class="sub">Resize, maximize, center or move: one window, every window of an app, or everything.</p>
+    <p>I always have several Chrome windows and a few VS Code windows open at once, and I needed a quick way to organize and move them. Now I can make every Chrome window the same 90%, center them all, or maximize everything in one go, each on the screen it's already on. And when I want them on another screen, it's the same idea: one window, a whole app, or everything.</p>
+    <p class="symbols">⌃ is Control, ⌥ is Option, ⌘ is Command, ⇧ is Shift.</p>
+    <ol class="ladder">
+      <li><kbd>⌥⌘G</kbd> <span>puts this window at 90%.</span></li>
+      <li><kbd>⌃⌥⌘G</kbd> <span>Add ⌃ to do it for every window of the app.</span></li>
+      <li><kbd>⌥⌘G⇧</kbd> <span>Add ⇧ to do it on the next screen.</span></li>
+      <li><kbd>⌃⌥⌘2</kbd> <span>sends every window of the app to screen 2, while <kbd>⌃⌥⌘2⇧</kbd> sends everything.</span></li>
+    </ol>
+    <p>Prefer the mouse? Click the icon at the top of your screen, pick a size (full screen, 90%, 60%, center, a half or a corner), then pick this window, all of an app's windows, everything, or any other open app by name.</p>
+    <p class="more">Every shortcut is listed in the <a href="https://github.com/cabaynes/window-shepherd#readme">README on GitHub</a>.</p>
+  </section>
+
+  <section id="story" class="prose">
+    <h2>Why I made it</h2>
+    <p>Hi, I'm Charles. I've used Rectangle for years and I love it. But I always have several windows of the same app open, like Chrome or VS Code, and I needed a quick way to organize and move them together. I also move between a few different monitor setups, and my Mac would often forget where everything went, so I'd move it all back by hand. So I built something for myself, first as a small script and now as a proper Mac app. I think of it as a supplement to Rectangle: it does the things I wished Rectangle did, and skips the parts I didn't personally use. I thought it might help someone else too.</p>
+    <p>I'm not a developer by trade; I built this with the help of AI (Claude Code). More about me at <a href="https://cccccccharles.com">cccccccharles.com</a>.</p>
+  </section>
+
+  <section id="start" class="prose">
+    <h2>How to start</h2>
+    <ol class="steps">
+      <li>Download it and drag it to Applications.</li>
+      <li>Open it. Your Mac will ask you to allow Window Shepherd in Accessibility. That sounds bigger than it is. It's the same permission every window app needs, and it only lets Window Shepherd move and resize windows. It can't see what's inside them, and it doesn't send anything off your Mac. The app shows you exactly where to click, and you can turn it off any time in System Settings.</li>
+      <li>That's it. Just work as usual. It starts with your Mac, and there's nothing to set up.</li>
+    </ol>
+  </section>
+
+  <section id="rectangle" class="prose">
+    <h2>Using it with Rectangle</h2>
+    <p><strong>A supplement to Rectangle, not a replacement.</strong> I'm a big fan of Rectangle. Window Shepherd does the things I wished Rectangle did (moving and tidying all of an app's windows at once, and remembering each monitor setup), and it skips the parts of Rectangle I didn't personally use.</p>
+    <p>If you mostly move one window at a time, Rectangle is probably all you need. It's where to go for fine-grained tiling (thirds, sixths, ninths), drag-to-snap and tiling a whole screen at once, and it's a mature app a great many people rely on.</p>
+    <p>Window Shepherd might help if you keep several windows per app, move between different monitor setups, and are tired of putting everything back by hand. You can use both.</p>
+    <p>The two share only a couple of shortcuts. While Rectangle is running, Window Shepherd steps aside on those, tells you once which ones, and takes them back when Rectangle quits.</p>
+    <p>If you already have Rectangle Pro, its saved layouts cover a lot of this. Window Shepherd is for people who'd rather not save or keep layouts up to date.</p>
+  </section>
+
+  <section id="trust" class="prose">
+    <h2>Light and private</h2>
+    <p><strong>Built not to slow your Mac down.</strong> The very first version of my script froze my whole laptop when one app stopped responding, so everything since has been built around not letting that happen. It never waits more than half a second on an app, a frozen app gets skipped and named rather than holding anything up, and its only background work is a light check every 2 seconds that reads the window list macOS already keeps.</p>
+    <p><strong>Private.</strong> It doesn't send anything about you anywhere. Its only connection is checking for updates. It asks for one permission, to move windows, and it can't see what's inside them.</p>
+    <p><strong>Free and open.</strong> No trial, no account. Anyone can read how it's made on GitHub.</p>
+  </section>
+
+  <section id="faq" class="prose">
+    <h2>Questions</h2>
+    <details><summary>Is it really free?</summary><p>Yes. No trial, no subscription, no account. If it saves you time, there's a "buy me a coffee" link, and that's all.</p></details>
+    <details><summary>Do I need to learn the shortcuts?</summary><p>No. The restore is automatic, and everything else is in the menu at the top of your screen. The shortcuts are there if you like them.</p></details>
+    <details><summary>Do I have to save layouts?</summary><p>No. It keeps track as you go, separately for each screen setup.</p></details>
+    <details><summary>What happens the first time I plug into a new monitor?</summary><p>There's nothing to remember yet, so you arrange things once. After that, it puts them back every time.</p></details>
+    <details><summary>Do I have to uninstall Rectangle?</summary><p>No. They work side by side, sharing only a couple of shortcuts, and Window Shepherd steps aside on those while Rectangle runs.</p></details>
+    <details><summary>Why does it need Accessibility permission?</summary><p>It's the same permission every window app needs, and it only lets Window Shepherd move and resize windows. It can't see what's inside them, and it doesn't send anything off your Mac. The app shows you exactly where to click, and you can turn it off any time in System Settings.</p></details>
+    <details><summary>Will it slow my Mac down?</summary><p>I built it so a frozen app can't hold it up, and its only background work is a light check every 2 seconds.</p></details>
+    <details><summary>Can I move just some of my Chrome windows?</summary><p>Not as a group. It moves one window, or every window of an app. Move the others one at a time with a shortcut.</p></details>
+    <details><summary>What about other desktops, full screen apps, Stage Manager or Zoom?</summary><p>Moves work on the windows you can see. Windows on other desktops are left where they are, and Zoom's floating controls are never moved. Stage Manager hasn't been tested yet.</p></details>
+    <details><summary>Does it work with two identical monitors, docks or three monitors?</summary><p>Screens are numbered 1 for the laptop, then left to right. I've only tested it with one monitor so far.</p></details>
+    <details><summary>Does it work on an ultrawide?</summary><p>Yes, though halves on an ultrawide are big and there are no thirds. Rectangle is better for that.</p></details>
+    <details><summary>Which Macs does it run on?</summary><p>macOS 14 Sonoma or later.</p></details>
+    <details><summary>Is my data collected?</summary><p>No. Nothing leaves your Mac except the update check. The details are in the <a href="https://github.com/cabaynes/window-shepherd/blob/main/PRIVACY.md">privacy note</a>.</p></details>
+    <details><summary>Aren't there other apps that do this?</summary><p>Yes, a few. Rectangle Pro, Moom, Stay and Display Maid restore layouts you save first, and Monitor Glue remembers automatically like Window Shepherd does. Window Shepherd puts automatic memory together with moving whole apps or everything, and it's free.</p></details>
+    <details><summary>How do I uninstall it?</summary><p>Quit it from the menu and drag it to the Trash. To remove everything, also delete <code>~/Library/Application Support/Window Shepherd</code> and <code>~/Library/Logs/Window Shepherd</code>.</p></details>
+    <details><summary>How do I report a bug or suggest something?</summary><p>Open an issue on <a href="https://github.com/cabaynes/window-shepherd/issues">GitHub</a>.</p></details>
+  </section>
+</main>
+
+<footer id="footer" class="footer">
+  <p class="footer-mark">Window Shepherd</p>
+  <p>Made by Charles Baynes. <a href="https://buymeacoffee.com/cccccccharles">Buy me a coffee</a> if it saves you time.</p>
+  <p><a href="https://github.com/cabaynes/window-shepherd">GitHub</a> · <a href="https://github.com/cabaynes/window-shepherd/releases">Changes</a> · <a href="https://github.com/cabaynes/window-shepherd/blob/main/PRIVACY.md">Privacy</a> · <a href="https://github.com/cabaynes/window-shepherd/blob/main/LICENSE">MIT license</a></p>
+  <p class="credits">The halves, full screen and center keys follow the Spectacle-style keys many Rectangle users already know. Thank you to Rectangle and Spectacle. Headings set in Bungee Shade by David Jonathan Ross, under the SIL Open Font License.</p>
+</footer>
+
+</body>
+</html>
