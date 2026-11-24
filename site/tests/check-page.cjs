@@ -244,7 +244,7 @@ checks.push({ name: 'icons exist', per: 'once', run: async ({ open }) => {
   const { page, ctx } = await open(noAutoplay);
   const hrefs = await page.evaluate(() => [...document.querySelectorAll('link[rel~="icon"], link[rel="apple-touch-icon"]')].map(l => l.href));
   const bad = [];
-  for (const h of [...hrefs, new URL('/favicon.ico', page.url()).href]) {
+  for (const h of [...hrefs, new URL('favicon.ico', BASE + '/').href]) {   // the site may sit under a path (github.io)
     const r = await page.request.get(h);
     if (r.status() !== 200 || !/^image\//.test(r.headers()['content-type'] || '')) bad.push(`${h} ${r.status()} ${r.headers()['content-type']}`);
   }
@@ -260,7 +260,7 @@ checks.push({ name: 'link preview card', per: 'once', run: async ({ open }) => {
   const img = og['og:image'] || '';
   let size = null;
   if (img) {
-    const local = new URL(new URL(img).pathname, page.url()).href;   // check the file this site serves
+    const local = new URL(new URL(img).pathname.slice(1), BASE + '/').href;   // the file this copy of the site serves
     size = await page.evaluate(async src => { const i = new Image(); i.src = src; await i.decode(); return [i.naturalWidth, i.naturalHeight]; }, local);
   }
   await ctx.close();
