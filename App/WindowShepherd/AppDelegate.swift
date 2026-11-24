@@ -21,7 +21,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     static let activeNotification = Notification.Name("com.windowshepherd.WindowShepherd.active")
     static let queryNotification = Notification.Name("com.windowshepherd.WindowShepherd.query")
 
+    private var isDuplicate = false
+
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // One copy at a time: two would fight over the same keys and the same windows
+        // (seen 2026-11-24: a stale build in build/dmg opened alongside the real one).
+        let me = ProcessInfo.processInfo.processIdentifier
+        if let id = Bundle.main.bundleIdentifier,
+           let other = NSRunningApplication.runningApplications(withBundleIdentifier: id)
+               .first(where: { $0.processIdentifier != me && !$0.isTerminated }) {
+            Log.info("another copy is already running (\(other.bundleURL?.path ?? "pid \(other.processIdentifier)")); this one quits")
+            isDuplicate = true
+            Log.flush()   // the line is written in the background; quitting would drop it
+            NSApp.terminate(nil)
+            return
+        }
         Log.info("Window Shepherd \(Bundle.main.shortVersion) started")
         updater = Updater()
         shepherd = Shepherd(system: LiveWindowSystem(), store: LayoutStore())
@@ -88,6 +102,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        guard !isDuplicate else { return }   // the running copy is still on: don't say otherwise
         DistributedNotificationCenter.default().postNotificationName(Self.activeNotification, object: "0",
                                                                      userInfo: nil, deliverImmediately: true)
     }
