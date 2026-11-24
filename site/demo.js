@@ -19,6 +19,7 @@ const state = createDemo();
 let scope = 'window';
 let timers = [];
 let settle = Promise.resolve();
+let finishSettle = () => {};   // resolves the current run's `settled`, also when it's cut short
 let visitorClicked = false;
 
 const el = (tag, attrs = {}, ...kids) => {
@@ -49,11 +50,19 @@ cable.innerHTML = '<svg viewBox="0 0 100 20" preserveAspectRatio="none"><path cl
 stage.append(device(1), device(2), cable);
 
 const winEls = new Map();
+const nameOf = new Map();
 for (const w of state.windows) {
-  const b = el('button', { type: 'button', class: 'win', 'data-win': w.id, 'data-app': w.app, 'aria-label': `${w.label} window` },
+  const same = state.windows.filter(o => o.app === w.app);
+  nameOf.set(w.id, same.length > 1 ? `${w.label} window ${same.indexOf(w) + 1}` : `${w.label} window`);
+}
+for (const w of state.windows) {
+  const b = el('button', { type: 'button', class: 'win', 'data-win': w.id, 'data-app': w.app, 'aria-label': nameOf.get(w.id) },
     el('span', { class: 'win-bar' }, el('i'), el('i'), el('i'), el('span', { class: 'win-name' }, w.label)),
     el('span', { class: 'win-body' }));
-  b.addEventListener('click', () => { visitor(); focus(state, w.id); paintFocus(); paintKeys(); });
+  b.addEventListener('click', () => {
+    visitor(); focus(state, w.id); paintFocus(); paintKeys();
+    caption.textContent = `${nameOf.get(w.id)} is selected. Pick what to do with it below.`;
+  });
   winEls.set(w.id, b);
   stage.append(b);
 }
@@ -79,7 +88,10 @@ function jumpToState() {
 }
 
 function paintFocus() {
-  for (const [id, e] of winEls) e.classList.toggle('is-focused', id === state.focused);
+  for (const [id, e] of winEls) {
+    e.classList.toggle('is-focused', id === state.focused);
+    e.setAttribute('aria-pressed', String(id === state.focused));
+  }
 }
 
 // ---------- the controls ----------
@@ -103,7 +115,11 @@ const focusedApp = () => state.windows.find(w => w.id === state.focused).app;
 
 function paintKeys() {
   const from = state.windows.find(w => w.id === state.focused).at.screen;
-  for (const b of actionBtns) b.querySelector('kbd').textContent = shortcutFor(modelScope(), b.dataset.action, from);
+  for (const b of actionBtns) {
+    // With one screen there are no screen-number keys (content.md 5.3).
+    const none = b.dataset.action === 'other' && !state.plugged;
+    b.querySelector('kbd').textContent = none ? '' : shortcutFor(modelScope(), b.dataset.action, from);
+  }
   scopeBtns[1].textContent = `All of ${focusedApp()}`;
 }
 
@@ -124,6 +140,7 @@ function cancel() {
   timers.forEach(clearTimeout);
   timers = [];
   jumpToState();
+  finishSettle();
 }
 
 const later = (ms, fn) => { timers.push(setTimeout(fn, ms)); };
@@ -141,6 +158,7 @@ function run(steps) {
     return settle;
   }
   settle = new Promise(resolve => {
+    finishSettle = resolve;
     let t = 0;
     steps.forEach((s, i) => {
       if (i > 0) t += BETWEEN_STEPS_MS;

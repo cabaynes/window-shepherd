@@ -114,3 +114,31 @@ test('plug in restores the arrangement you had when you unplugged, not the start
   unplug(s); plugIn(s);
   assert.ok(same(byId(s, 'chrome-2').at, arranged));
 });
+
+test('plug in skips a step with nothing to move', () => {
+  const s = createDemo();
+  for (const id of ['chrome-1', 'messages']) { focus(s, id); act(s, 'window', 'other'); }   // both onto the laptop
+  unplug(s);
+  const steps = plugIn(s);
+  assert.ok(steps.every(st => st.moves.length > 0), 'no empty steps');
+  assert.equal(steps.length, 1);
+  assert.equal(steps[0].who, 'shepherd');
+});
+
+test('plug in with nothing to move says so', () => {
+  const s = createDemo();
+  for (const w of s.windows) { focus(s, w.id); if (w.at.screen === 2) act(s, 'window', 'other'); }   // everything on the laptop
+  unplug(s);
+  const steps = plugIn(s);
+  assert.equal(steps.length, 1);
+  assert.equal(steps[0].moves.length, 0);
+  assert.match(steps[0].caption, /nothing/i);
+});
+
+test('unplug with nothing on the monitor says so', () => {
+  const s = createDemo();
+  for (const w of s.windows) { focus(s, w.id); if (w.at.screen === 2) act(s, 'window', 'other'); }
+  const steps = unplug(s);
+  assert.equal(steps[0].moves.length, 0);
+  assert.match(steps[0].caption, /nothing/i);
+});

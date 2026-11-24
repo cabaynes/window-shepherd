@@ -57,7 +57,7 @@ checks.push({ name: 'sections in order', per: 'viewport', run: async ({ page }) 
 
 checks.push({ name: 'no unverified claims', per: 'viewport', run: async ({ page }) => {
   const text = await page.evaluate(() => document.body.innerText);
-  const bad = ['[verify', '[Charles', 'identical monitors are kept apart', 'Intel', '[month]'].filter(t => text.includes(t));
+  const bad = ['[verify', '[Charles', 'identical monitors are kept apart', 'Intel', '[month]', 'full screen apps'].filter(t => text.includes(t));
   return bad.length === 0 || 'found ' + bad.join(', ');
 }});
 
@@ -267,6 +267,43 @@ checks.push({ name: 'link preview card', per: 'once', run: async ({ open }) => {
   if (!img.startsWith('https://windowshepherd.com/')) return 'og:image not absolute: ' + img;
   if (!og['og:title'] || !og['og:description'] || og['twitter:card'] !== 'summary_large_image') return JSON.stringify(og);
   return (size && size[0] === 1200 && size[1] === 630) || 'og.png size ' + size;
+}});
+
+checks.push({ name: 'a cancelled animation still settles', per: 'once', run: async ({ open }) => {
+  const { page, ctx } = await quietPage(open);
+  const done = await page.evaluate(async () => {
+    document.querySelector('[data-plug]').click();
+    const first = window.__demo.settled.then(() => true);
+    document.querySelector('[data-plug]').click();   // cuts the first run short
+    return Promise.race([first, new Promise(r => setTimeout(() => r(false), 1500))]);
+  });
+  await ctx.close();
+  return done || 'the first run\'s settled promise never resolved';
+}});
+
+checks.push({ name: 'no shortcut shown on the disabled button', per: 'once', run: async ({ open }) => {
+  const { page, ctx } = await quietPage(open);
+  await clickPlug(page); await settled(page);
+  const keys = await page.textContent('[data-action="other"] kbd');
+  await clickPlug(page); await settled(page);
+  const back = await page.textContent('[data-action="other"] kbd');
+  await ctx.close();
+  return (keys === '' && back !== '') || `unplugged "${keys}", plugged "${back}"`;
+}});
+
+checks.push({ name: 'toy windows have unique names and say which is selected', per: 'once', run: async ({ open }) => {
+  const { page, ctx } = await quietPage(open);
+  await page.click('[data-win="code-2"]');
+  const r = await page.evaluate(() => {
+    const wins = [...document.querySelectorAll('[data-win]')];
+    return { names: wins.map(w => w.getAttribute('aria-label')),
+      pressed: wins.filter(w => w.getAttribute('aria-pressed') === 'true').map(w => w.dataset.win),
+      caption: document.querySelector('.caption').textContent };
+  });
+  await ctx.close();
+  if (new Set(r.names).size !== r.names.length) return 'duplicate names: ' + r.names.join(', ');
+  if (r.pressed.join() !== 'code-2') return 'aria-pressed on: ' + r.pressed.join();
+  return /selected/i.test(r.caption) || 'caption: ' + r.caption;
 }});
 
 module.exports = { checks };

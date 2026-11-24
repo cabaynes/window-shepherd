@@ -10,7 +10,7 @@ DMG="${1:?usage: scripts/make-appcast.sh <dmg> <version>}"
 VERSION="${2:?usage: scripts/make-appcast.sh <dmg> <version>}"
 scripts/fetch-sparkle.sh
 STAGE=build/appcast
-mkdir -p "$STAGE" docs
+mkdir -p "$STAGE" site
 cp "$DMG" "$STAGE/"
 [ -f site/appcast.xml ] && cp site/appcast.xml "$STAGE/appcast.xml"
 vendor/Sparkle/bin/generate_appcast \

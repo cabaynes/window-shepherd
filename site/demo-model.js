@@ -45,7 +45,9 @@ export function unplug(s) {
     const x = .04 + i * .05, y = .06 + i * .05;
     return move(s, w, { screen: 1, x, y, w: Math.min(w.at.w, 1 - x), h: Math.min(w.at.h, 1 - y) });
   });
-  return [{ who: 'macos', moves, caption: 'You unplugged. macOS piles everything onto the laptop.' }];
+  const caption = moves.length ? 'You unplugged. macOS piles everything onto the laptop.'
+    : 'You unplugged. Nothing was on the monitor, so nothing moves.';
+  return [{ who: 'macos', moves, caption }];
 }
 
 export function plugIn(s) {
@@ -55,10 +57,13 @@ export function plugIn(s) {
   const away = s.windows.filter(w => back[w.id] && !sameAt(w.at, back[w.id]));
   const byMac = away.filter(w => MACOS_PUTS_BACK.includes(w.id) && back[w.id].screen === 2);
   const rest = away.filter(w => !byMac.includes(w));
-  return [
+  const steps = [
     { who: 'macos', moves: byMac.map(w => move(s, w, back[w.id])), caption: 'Plugged back in. macOS puts a couple back on its own…' },
-    { who: 'shepherd', moves: rest.map(w => move(s, w, back[w.id])), caption: '…and Window Shepherd puts back the rest, exactly where they were.' },
-  ];
+    { who: 'shepherd', moves: rest.map(w => move(s, w, back[w.id])),
+      caption: byMac.length ? '…and Window Shepherd puts back the rest, exactly where they were.'
+        : 'Plugged back in. Window Shepherd puts your windows back, exactly where they were.' },
+  ].filter(st => st.moves.length > 0);
+  return steps.length ? steps : [{ who: 'macos', moves: [], caption: 'Plugged back in. Nothing needed moving.' }];
 }
 
 const KEY = { full: 'F', ninety: 'G', center: 'C' };
