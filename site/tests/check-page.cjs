@@ -141,10 +141,12 @@ checks.push({ name: 'other screen disabled while unplugged', per: 'once', run: a
   const r = await page.evaluate(() => {
     const b = document.querySelector('[data-action="other"]');
     const why = document.getElementById(b.getAttribute('aria-describedby') || '');
-    return { disabled: b.disabled, why: why ? why.textContent : '' };
+    const ink = c => getComputedStyle(c).color;
+    return { disabled: b.disabled, why: why ? why.textContent : '', color: ink(b.querySelector('.action-name')) };
   });
   await ctx.close();
-  return (r.disabled && /plug/i.test(r.why)) || JSON.stringify(r);
+  // CLAUDE.md: nothing the user reads is drawn faint/disabled grey.
+  return (r.disabled && /plug/i.test(r.why) && r.color === 'rgb(0, 0, 0)') || JSON.stringify(r);
 }});
 
 checks.push({ name: 'scope toggle is keyboard-usable', per: 'once', run: async ({ open }) => {
@@ -180,15 +182,20 @@ checks.push({ name: 'autoplay yields to a click', per: 'once', run: async ({ ope
   return !moved || 'windows moved after the visitor clicked';
 }});
 
-checks.push({ name: 'autoplay replugs once by itself', per: 'once', run: async ({ open }) => {
+checks.push({ name: 'autoplay waits until the demo is in view, then replugs once', per: 'once', run: async ({ open }) => {
   const { page, ctx } = await open(noAutoplay);
   await page.waitForFunction(() => window.__demo);
+  const below = await page.evaluate(() => document.querySelector('[data-demo]').getBoundingClientRect().top > innerHeight * .5);
+  await page.waitForTimeout(3000);
+  const early = await page.evaluate(() => !window.__demo.state.plugged);
+  await page.evaluate(() => document.querySelector('[data-demo]').scrollIntoView({ block: 'center' }));
   const sawUnplug = await page.waitForFunction(() => !window.__demo.state.plugged, null, { timeout: 4000 }).then(() => true, () => false);
   await page.waitForFunction(() => window.__demo.state.plugged, null, { timeout: 8000 }).catch(() => {});
   await settled(page);
   const ps = await placement(page);
   await ctx.close();
-  if (!sawUnplug) return 'never unplugged by itself';
+  if (below && early) return 'played before the demo was in view';
+  if (!sawUnplug) return 'never unplugged by itself once in view';
   return !where(ps) || where(ps);
 }});
 
@@ -203,6 +210,21 @@ checks.push({ name: 'reduced motion: no autoplay, moves are instant', per: 'once
   await ctx.close();
   if (!stillPlugged) return 'autoplayed under reduced motion';
   return !where(ps) || 'not instant: ' + where(ps);
+}});
+
+checks.push({ name: 'each app has its own title-bar tint', per: 'viewport', run: async ({ page }) => {
+  await page.waitForFunction(() => window.__demo);
+  const bars = await page.evaluate(() => [...document.querySelectorAll('[data-win]')].map(w => ({
+    app: w.dataset.app, bg: getComputedStyle(w.querySelector('.win-bar')).backgroundColor })));
+  const byApp = {};
+  for (const b of bars) (byApp[b.app] ||= new Set()).add(b.bg);
+  const unfocused = await page.evaluate(() => [...document.querySelectorAll('[data-win]:not(.is-focused)')].map(w => ({
+    app: w.dataset.app, bg: getComputedStyle(w.querySelector('.win-bar')).backgroundColor })));
+  const colours = {};
+  for (const u of unfocused) (colours[u.app] ||= new Set()).add(u.bg);
+  const tints = Object.values(colours).map(c => [...c][0]);
+  if (Object.values(colours).some(c => c.size > 1)) return 'one app, several tints: ' + JSON.stringify(Object.fromEntries(Object.entries(colours).map(([k, v]) => [k, [...v]])));
+  return new Set(tints).size === tints.length || 'apps share a tint: ' + JSON.stringify(Object.fromEntries(Object.entries(colours).map(([k, v]) => [k, [...v]])));
 }});
 
 // Charles, 2026-11-24: the text above and below the demo runs at least as wide as the demo.

@@ -55,13 +55,21 @@ test('act app ninety resizes both Chrome windows on their own screen', () => {
   assert.ok(same(byId(s, 'notes').at, byId(s, 'notes').home), 'other apps untouched');
 });
 
-test('act all other while plugged sends laptop windows to the monitor at 90% and monitor windows to the laptop full', () => {
+test('act all other sends everything to the screen opposite the focused window', () => {
   const s = createDemo();
-  focus(s, 'notes');
+  focus(s, 'notes');   // on the laptop, so the target is screen 2: 90% on a monitor
   const r = act(s, 'all', 'other');
   assert.equal(r.keys, '⌃⌥⌘2⇧');
-  assert.ok(same(byId(s, 'notes').at, { screen: 2, x: .05, y: .05, w: .9, h: .9 }));
-  assert.ok(same(byId(s, 'chrome-1').at, { screen: 1, x: 0, y: 0, w: 1, h: 1 }));
+  for (const w of s.windows) assert.ok(same(w.at, { screen: 2, x: .05, y: .05, w: .9, h: .9 }), w.id);
+});
+
+test('act app other sends every window of the app to one screen, full screen on the laptop', () => {
+  const s = createDemo();
+  focus(s, 'code-1');   // VS Code: code-1 on the monitor, code-2 on the laptop
+  const r = act(s, 'app', 'other');
+  assert.equal(r.keys, '⌃⌥⌘1');
+  for (const id of ['code-1', 'code-2']) assert.ok(same(byId(s, id).at, { screen: 1, x: 0, y: 0, w: 1, h: 1 }), id);
+  assert.ok(same(byId(s, 'chrome-1').at, byId(s, 'chrome-1').home), 'other apps untouched');
 });
 
 test('other-screen unavailable while unplugged', () => {

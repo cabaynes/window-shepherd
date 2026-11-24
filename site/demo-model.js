@@ -81,12 +81,15 @@ export function act(s, scope, action) {
   const targets = scope === 'window' ? [focused]
     : scope === 'app' ? s.windows.filter(w => w.app === focused.app)
     : s.windows;
+  // ⌥⌘n / ⌃⌥⌘n / ⌃⌥⌘n⇧ send every target to screen n: the one opposite the focused window,
+  // full screen on the laptop and 90% on the monitor (content.md 5.3).
+  const dest = focused.at.screen === 1 ? { screen: 2, ...NINETY } : { screen: 1, ...FULL };
   const moves = targets.map(w => {
     const { screen } = w.at;
     if (action === 'full') return move(s, w, { screen, ...FULL });
     if (action === 'ninety') return move(s, w, { screen, ...NINETY });
     if (action === 'center') return move(s, w, { screen, x: (1 - w.at.w) / 2, y: (1 - w.at.h) / 2, w: w.at.w, h: w.at.h });
-    return move(s, w, screen === 1 ? { screen: 2, ...NINETY } : { screen: 1, ...FULL });
+    return move(s, w, dest);
   });
   const who = scope === 'window' ? 'This window' : scope === 'app' ? `${focused.app}'s windows` : 'Everything';
   return { steps: [{ who: 'you', moves, caption: `${who} → ${WHAT[action]}` }], keys };

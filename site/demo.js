@@ -7,7 +7,7 @@ const DISPLAY = {
   1: { l: 2, t: 36, w: 34, h: 47 },    // laptop
   2: { l: 44, t: 3, w: 54, h: 70 },    // monitor
 };
-const MOVE_MS = 450, STAGGER_MS = 60, BETWEEN_STEPS_MS = 900, RING_MS = 700, AUTOPLAY_MS = 1500;
+const MOVE_MS = 450, STAGGER_MS = 60, BETWEEN_STEPS_MS = 900, RING_MS = 700, AUTOPLAY_MS = 700;
 
 const root = document.getElementById('demo');
 const stage = root.querySelector('[data-demo]');
@@ -196,11 +196,17 @@ paintFocus();
 paintControls();
 caption.textContent = 'This is a laptop and an external monitor. Try unplugging it.';
 
-if (!reduced.matches) {
-  later(AUTOPLAY_MS, () => {
-    if (visitorClicked) return;
-    doPlug().then(() => later(1200, () => { if (!visitorClicked) doPlug(); }));
-  });
+// The one automatic replug waits until the demo is in view: it sits below the fold.
+if (!reduced.matches && 'IntersectionObserver' in window) {
+  const seen = new IntersectionObserver(entries => {
+    if (!entries.some(e => e.isIntersecting)) return;
+    seen.disconnect();
+    later(AUTOPLAY_MS, () => {
+      if (visitorClicked) return;
+      doPlug().then(() => later(1200, () => { if (!visitorClicked) doPlug(); }));
+    });
+  }, { threshold: .6 });
+  seen.observe(stage);
 }
 
 window.__demo = { state, get settled() { return settle; } };

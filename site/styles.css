@@ -254,6 +254,10 @@ details p { margin: 0 0 1em; }
 }
 .win-bar i { width: clamp(3px, .45vw, 6px); aspect-ratio: 1; border-radius: 50%; background: #C3C9D6; flex: none; }
 .win-name { margin-left: .4em; font-size: clamp(9px, .85vw, 11px); font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.win[data-app="Chrome"] .win-bar { background: #FFE7A3; }
+.win[data-app="VS Code"] .win-bar { background: #C9DAFF; }
+.win[data-app="Notes"] .win-bar { background: #EEDCFF; }
+.win[data-app="Messages"] .win-bar { background: #C6F3D3; }
 .win.is-focused .win-bar { background: var(--blue); }
 .win.is-focused .win-bar i { background: rgba(255, 255, 255, .55); }
 .win.is-focused .win-name { color: var(--paper); }
@@ -306,6 +310,5 @@ details p { margin: 0 0 1em; }
   padding: .45em .8em; font-weight: 600;
 }
 .action kbd { color: var(--blue); font-weight: 600; font-size: .82em; }
-.action:disabled { border-style: dashed; color: #555; }
-.action:disabled kbd { color: #555; }
+.action:disabled { border-style: dashed; }   /* dashed, never grey: nothing the user reads is drawn faint */
 .needs-monitor { margin: 0; font-size: .9em; }
