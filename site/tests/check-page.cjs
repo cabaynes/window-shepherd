@@ -311,6 +311,47 @@ checks.push({ name: 'footer names ChaCha Ventures', per: 'viewport', run: async 
   return /© 20\d\d ChaCha Ventures/.test(t) || 'footer: ' + t.slice(0, 120);
 }});
 
+// Charles, 2026-11-24 (on his phone): the shortcut ladder and the demo's buttons wrapped badly.
+checks.push({ name: 'shortcut ladder: each key sits on its line', per: 'viewport', run: async ({ page }) => {
+  const off = await page.evaluate(() => [...document.querySelectorAll('.ladder li')].map(li => {
+    const k = li.querySelector(':scope > kbd').getBoundingClientRect(), t = li.querySelector('span').getBoundingClientRect();
+    return Math.abs(k.top - t.top) < k.height && t.left > k.right - 1;
+  }));
+  return off.every(Boolean) || 'keys on their own line: ' + off.map((ok, i) => ok ? null : i + 1).filter(Boolean).join(', ');
+}});
+
+checks.push({ name: 'demo buttons in tidy rows', per: 'viewport', run: async ({ page }) => {
+  const r = await page.evaluate(() => {
+    const rows = sel => new Set([...document.querySelectorAll(sel)].map(b => Math.round(b.getBoundingClientRect().top))).size;
+    const wrapped = [...document.querySelectorAll('.scope, .action, .plug')].filter(b => {
+      const lh = parseFloat(getComputedStyle(b).lineHeight) || 20;
+      return b.querySelector('.action-name, :scope') && b.clientHeight > lh * 2.2;
+    }).map(b => b.textContent.trim());
+    return { scope: rows('.scope'), actions: rows('.action'), wrapped, narrow: innerWidth < 600 };
+  });
+  if (r.scope !== 1) return `scope buttons on ${r.scope} rows`;
+  if (r.actions > (r.narrow ? 2 : 1)) return `action buttons on ${r.actions} rows`;
+  return r.wrapped.length === 0 || 'text wraps inside: ' + r.wrapped.join(', ');
+}});
+
+// Charles: on a phone you can't tell how much page is left. Dots down the side show where you are.
+checks.push({ name: 'section dots show where you are', per: 'viewport', run: async ({ page }) => {
+  const dots = await page.$$eval('nav.dots a', as => as.map(a => a.getAttribute('href')));
+  if (dots.length < 7) return `${dots.length} dots`;
+  await page.evaluate(() => document.getElementById('faq').scrollIntoView({ block: 'start', behavior: 'instant' }));
+  await page.waitForTimeout(400);
+  const r = await page.evaluate(() => {
+    const cur = document.querySelector('nav.dots a[aria-current="true"]');
+    const nav = document.querySelector('nav.dots').getBoundingClientRect();
+    const text = document.querySelector('#faq').getBoundingClientRect();
+    return { cur: cur && cur.getAttribute('href'), visible: nav.width > 0 && nav.right <= innerWidth, clear: nav.left >= text.right - 1 };
+  });
+  await page.evaluate(() => scrollTo({ top: 0, behavior: 'instant' }));
+  if (r.cur !== '#faq') return 'current dot: ' + r.cur;
+  if (!r.visible) return 'dots not visible';
+  return r.clear || 'dots overlap the text';
+}});
+
 module.exports = { checks };
 
 async function serve() {
