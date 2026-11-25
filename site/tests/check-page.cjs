@@ -269,6 +269,31 @@ checks.push({ name: 'link preview card', per: 'once', run: async ({ open }) => {
   return (size && size[0] === 1200 && size[1] === 630) || 'og.png size ' + size;
 }});
 
+checks.push({ name: 'search engines: robots, sitemap, structured data', per: 'once', run: async ({ open }) => {
+  const { page, ctx } = await open(noAutoplay);
+  const robots = await page.request.get(new URL('robots.txt', BASE + '/').href);
+  const sitemap = await page.request.get(new URL('sitemap.xml', BASE + '/').href);
+  const robotsText = robots.status() === 200 ? await robots.text() : '';
+  const sitemapText = sitemap.status() === 200 ? await sitemap.text() : '';
+  const { ld, canonical } = await page.evaluate(() => ({
+    ld: [...document.querySelectorAll('script[type="application/ld+json"]')].map(s => s.textContent),
+    canonical: document.querySelector('link[rel="canonical"]')?.href,
+  }));
+  await ctx.close();
+  if (!/^Sitemap: https:\/\/windowshepherd\.com\/sitemap\.xml$/m.test(robotsText)) return 'robots.txt ' + robots.status() + ' lacks the sitemap line';
+  if (/^Disallow: *\/\s*$/m.test(robotsText)) return 'robots.txt blocks the whole site';
+  if (!sitemapText.includes(`<loc>${canonical}</loc>`)) return 'sitemap.xml ' + sitemap.status() + ' lacks ' + canonical;
+  if (ld.length !== 1) return `${ld.length} structured-data blocks`;
+  let graph;
+  try { graph = JSON.parse(ld[0])['@graph']; } catch (e) { return 'structured data is not valid JSON: ' + e.message; }
+  const app = (graph || []).find(n => n['@type'] === 'SoftwareApplication');
+  if (!app) return 'no SoftwareApplication';
+  if (app.url !== canonical || app.offers?.price !== '0' || !app.operatingSystem) return JSON.stringify(app);
+  // Nothing the release hasn't made true yet: no download, version, size or ratings.
+  const early = ['downloadUrl', 'softwareVersion', 'fileSize', 'aggregateRating', 'review'].filter(k => k in app);
+  return early.length === 0 || 'claims before release: ' + early.join(', ');
+}});
+
 checks.push({ name: 'a cancelled animation still settles', per: 'once', run: async ({ open }) => {
   const { page, ctx } = await quietPage(open);
   const done = await page.evaluate(async () => {
