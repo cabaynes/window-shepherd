@@ -304,6 +304,7 @@ Keyboard order: ⌃ ⌥ ⌘ key ⇧. ⌃ = Control, ⌥ = Option, ⌘ = Command,
   - your shortcuts
   - where your windows were (window number, app name, position; forgotten after 30 days unseen)
   - a small log (under 512 KB)
+- **The website** (PRIVACY.md "The website"): Google Analytics counts visits and referrers, with cookies. Decided 2026-11-25 by Charles, without a consent banner. The app sends nothing.
 
 ### 5.9 Requirements and install
 
@@ -387,7 +388,7 @@ Never claim to be the only one.
 12. **Does it work with two identical monitors, docks or three monitors?** **[verify at release]** for each before answering yes. The honest answer today: "Screens are numbered 1 for the laptop, then left to right. I've only tested it with one monitor so far."
 13. **Does it work on an ultrawide?** Yes, though halves on an ultrawide are big and there are no thirds. Rectangle is better for that.
 14. **Which Macs does it run on?** macOS 14 Sonoma or later, on Apple Silicon or Intel. **[verify at release: run once on an Intel Mac]**
-15. **Is my data collected?** No. Nothing leaves your Mac except the update check. Link PRIVACY.md.
+15. **Is my data collected?** Not by the app. Nothing leaves your Mac except the update check. This website uses Google Analytics to count visits. Link PRIVACY.md.
 16. **Aren't there other apps that do this?** Use the 6.2 wording.
 17. **How do I uninstall it?** Quit it from the menu and drag it to the Trash (see 5.9 for removing everything).
 18. **How do I report a bug or suggest something?** GitHub Issues (settled 2026-11-07: no email address at launch).

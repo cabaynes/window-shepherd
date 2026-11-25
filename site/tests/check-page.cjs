@@ -26,10 +26,24 @@ checks.push({ name: 'no horizontal scroll', per: 'viewport', run: async ({ page 
   return sw <= iw || `scrollWidth ${sw} > ${iw}`;
 }});
 
+// Google Analytics is the one outside request allowed (decided 2026-11-25), and only its loader.
+const GA_LOADER = /^https:\/\/www\.googletagmanager\.com\/gtag\/js\?id=G-[A-Z0-9]+$/;
+
 checks.push({ name: 'no requests leave the site', per: 'viewport', run: async ({ requests }) => {
   const origin = new URL(BASE).origin;
-  const outside = requests.filter(u => !u.startsWith(origin) && !u.startsWith('data:'));
+  const outside = requests.filter(u => !u.startsWith(origin) && !u.startsWith('data:') && !GA_LOADER.test(u));
   return outside.length === 0 || outside.join(', ');
+}});
+
+checks.push({ name: 'Google Analytics: a real ID, loaded on windowshepherd.com only', per: 'viewport', run: async ({ page, requests }) => {
+  const { id, live } = await page.evaluate(() => {
+    const s = [...document.querySelectorAll('script:not([src])')].find(s => s.textContent.includes('googletagmanager'));
+    return { id: s && (s.textContent.match(/var gaId = '([^']*)'/) || [])[1], live: location.hostname === 'windowshepherd.com' };
+  });
+  if (!id || !/^G-[A-Z0-9]{6,12}$/.test(id) || id === 'G-MEASUREMENT') return 'measurement ID not set: ' + id;
+  const loaded = requests.filter(u => u.includes('googletagmanager.com'));
+  if (!live) return loaded.length === 0 || 'a local copy loaded Analytics: ' + loaded.join(', ');
+  return (loaded.length === 1 && loaded[0].endsWith('?id=' + id)) || 'live page loaded: ' + (loaded.join(', ') || 'nothing');
 }});
 
 checks.push({ name: 'no console errors', per: 'viewport', run: async ({ errors }) => errors.length === 0 || errors.join(' | ') });
@@ -423,6 +437,9 @@ async function main() {
     const page = await ctx.newPage();
     page.setDefaultTimeout(8000);
     const requests = [], errors = [];
+    // Stand in for Google's scripts so checks of the live site never count as visits in Analytics.
+    await ctx.route(/^https:\/\/([a-z0-9-]+\.)*(googletagmanager|google-analytics|google)\.com\//,
+      r => r.fulfill({ status: 200, contentType: 'application/javascript', body: '' }));
     page.on('request', r => requests.push(r.url()));
     page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
     page.on('pageerror', e => errors.push(String(e)));

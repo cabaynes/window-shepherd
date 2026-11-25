@@ -13,3 +13,7 @@ Window Shepherd collects nothing and sends nothing about you anywhere.
   - a small log of what it did, for troubleshooting (`~/Library/Logs/Window Shepherd/`, under 512 KB)
 
 Delete those files and the app's preferences, and nothing of it remains.
+
+## The website
+
+windowshepherd.com uses Google Analytics to count visits and see how people find it: which site or search sent them, roughly where they are, and what device they use. Google sets cookies to do this. The app has nothing to do with it and sends nothing.

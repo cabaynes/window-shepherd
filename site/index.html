@@ -19,6 +19,20 @@
 <meta property="og:image:height" content="630">
 <meta property="og:image:alt" content="Window Shepherd: quickly tidy your app windows, move them between screens, and put it all back the way it was.">
 <meta name="twitter:card" content="summary_large_image">
+<script>
+// Google Analytics, on windowshepherd.com itself only: local copies and the page check's own server send nothing.
+if (location.hostname === 'windowshepherd.com') {
+  var gaId = 'G-JBV76MP19P';
+  var ga = document.createElement('script');
+  ga.async = true;
+  ga.src = 'https://www.googletagmanager.com/gtag/js?id=' + gaId;
+  document.head.appendChild(ga);
+  window.dataLayer = window.dataLayer || [];
+  window.gtag = function () { dataLayer.push(arguments); };
+  gtag('js', new Date());
+  gtag('config', gaId);
+}
+</script>
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
@@ -159,7 +173,7 @@
     <details><summary>Does it work with two identical monitors, docks or three monitors?</summary><p>Screens are numbered 1 for the laptop, then left to right. I've only tested it with one monitor so far.</p></details>
     <details><summary>Does it work on an ultrawide?</summary><p>Yes, though halves on an ultrawide are big and there are no thirds. Rectangle is better for that.</p></details>
     <details><summary>Which Macs does it run on?</summary><p>macOS 14 Sonoma or later.</p></details>
-    <details><summary>Is my data collected?</summary><p>No. Nothing leaves your Mac except the update check. The details are in the <a href="https://github.com/cabaynes/window-shepherd/blob/main/PRIVACY.md">privacy note</a>.</p></details>
+    <details><summary>Is my data collected?</summary><p>Not by the app. Nothing leaves your Mac except the update check. This website uses Google Analytics to count visits. The details are in the <a href="https://github.com/cabaynes/window-shepherd/blob/main/PRIVACY.md">privacy note</a>.</p></details>
     <details><summary>Aren't there other apps that do this?</summary><p>Yes, a few. Rectangle Pro, Moom, Stay and Display Maid restore layouts you save first, and Monitor Glue remembers automatically like Window Shepherd does. Window Shepherd puts automatic memory together with moving whole apps or everything, and it's free.</p></details>
     <details><summary>How do I uninstall it?</summary><p>Quit it from the menu and drag it to the Trash. To remove everything, also delete <code>~/Library/Application Support/Window Shepherd</code> and <code>~/Library/Logs/Window Shepherd</code>.</p></details>
     <details><summary>How do I report a bug or suggest something?</summary><p>Open an issue on <a href="https://github.com/cabaynes/window-shepherd/issues">GitHub</a>.</p></details>
