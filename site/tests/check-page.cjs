@@ -362,15 +362,46 @@ checks.push({ name: 'shortcut ladder: each key sits on its line', per: 'viewport
 checks.push({ name: 'demo buttons in tidy rows', per: 'viewport', run: async ({ page }) => {
   const r = await page.evaluate(() => {
     const rows = sel => new Set([...document.querySelectorAll(sel)].map(b => Math.round(b.getBoundingClientRect().top))).size;
-    const wrapped = [...document.querySelectorAll('.scope, .action, .plug')].filter(b => {
-      const lh = parseFloat(getComputedStyle(b).lineHeight) || 20;
-      return b.querySelector('.action-name, :scope') && b.clientHeight > lh * 2.2;
-    }).map(b => b.textContent.trim());
+    // A label wraps when its text runs over more than one line (on phones an action's keys sit on
+    // their own line under its name, which is fine; each of the two must stay on one line).
+    const lines = n => { const r = document.createRange(); r.selectNodeContents(n);
+      return new Set([...r.getClientRects()].filter(q => q.width > 0).map(q => Math.round(q.top))).size; };
+    const wrapped = [...document.querySelectorAll('.scope, .plug, .action-name, .action kbd')]
+      .filter(n => n.textContent.trim() && lines(n) > 1).map(n => n.textContent.trim());
     return { scope: rows('.scope'), actions: rows('.action'), wrapped, narrow: innerWidth < 600 };
   });
   if (r.scope !== 1) return `scope buttons on ${r.scope} rows`;
   if (r.actions > (r.narrow ? 2 : 1)) return `action buttons on ${r.actions} rows`;
   return r.wrapped.length === 0 || 'text wraps inside: ' + r.wrapped.join(', ');
+}});
+
+// Charles, 2026-11-25 (iPhone): pressing "Everything" pushed the demo's buttons off the right edge,
+// because "menu: Everything" is wider than the other keys. Check every scope, plugged and unplugged.
+checks.push({ name: 'demo fits a phone whichever scope is pressed', per: 'once', run: async ({ open }) => {
+  const bad = [];
+  for (const width of [360, 390]) {
+    const { page, ctx } = await quietPage(open, { viewport: { width, height: 800 } });
+    for (const plugged of [true, false]) {
+      if (!plugged) { await page.click('.plug'); await settled(page); }
+      for (const s of ['window', 'app', 'everything']) {
+        await page.click(`[data-scope="${s}"]`);
+        const r = await page.evaluate(() => ({
+          sw: document.documentElement.scrollWidth,
+          out: [...document.querySelectorAll('.controls button, .controls p')]
+            .filter(b => b.offsetParent && b.getBoundingClientRect().right > innerWidth + 0.5)
+            .map(b => b.textContent.trim().slice(0, 30)),
+          clipped: [...document.querySelectorAll('.controls button')]
+            .filter(b => b.scrollWidth > b.clientWidth + 1).map(b => b.textContent.trim().slice(0, 30)),
+        }));
+        const where = `${width}px ${plugged ? 'plugged' : 'unplugged'} ${s}`;
+        if (r.sw > width) bad.push(`${where}: scrollWidth ${r.sw}`);
+        if (r.out.length) bad.push(`${where}: off the edge: ${r.out.join(' / ')}`);
+        if (r.clipped.length) bad.push(`${where}: text cut off: ${r.clipped.join(' / ')}`);
+      }
+    }
+    await ctx.close();
+  }
+  return bad.length === 0 || bad.join('; ');
 }});
 
 // Charles: on a phone you can't tell how much page is left. Dots down the side show where you are.

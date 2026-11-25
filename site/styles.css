@@ -319,8 +319,10 @@ details p { margin: 0 0 1em; }
   .plug { width: 100%; }
   .row-scope { flex-wrap: nowrap; gap: 6px; }
   .scope { flex: 1 1 auto; font-size: .8em !important; padding: .55em .4em; white-space: nowrap; border-radius: 10px; }
-  .row-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-  .action { justify-content: space-between; font-size: .88em !important; white-space: nowrap; }
+  .controls { grid-template-columns: minmax(0, 1fr); }
+  .row-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; align-items: stretch; }
+  /* keys under the name: "menu: Everything" is too wide to sit beside it (Charles, 2026-11-25) */
+  .action { flex-direction: column; align-items: flex-start; gap: .15em; font-size: .88em !important; white-space: nowrap; }
 }
 
 /* ---------- section dots: where you are on the page ---------- */
