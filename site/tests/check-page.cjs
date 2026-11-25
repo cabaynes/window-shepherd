@@ -352,6 +352,24 @@ checks.push({ name: 'section dots show where you are', per: 'viewport', run: asy
   return r.clear || 'dots overlap the text';
 }});
 
+// A new page must never pair with an old stylesheet or script still cached (Charles's phone,
+// 2026-11-24: Pages caches 10 minutes). Every local CSS/JS address carries ?v=<version>, which
+// the publish workflow stamps with the commit (it's "dev" locally).
+checks.push({ name: 'stylesheets and scripts are versioned', per: 'once', run: async ({ open }) => {
+  const { page, ctx, requests } = await open(noAutoplay);
+  await page.waitForFunction(() => window.__demo);
+  await ctx.close();
+  const origin = new URL(BASE).origin;
+  const assets = requests.filter(u => u.startsWith(origin) && /\.(css|js)(\?|$)/.test(u));
+  const unversioned = assets.filter(u => !/\?v=[0-9a-z]+$/.test(u));
+  if (assets.length < 4) return 'only ' + assets.join(', ');
+  if (unversioned.length) return 'no version: ' + unversioned.join(', ');
+  const versions = new Set(assets.map(u => u.split('?v=')[1]));
+  if (versions.size !== 1) return 'mixed versions: ' + [...versions].join(', ');
+  if (process.env.BASE && versions.has('dev')) return 'published copy is not stamped';
+  return true;
+}});
+
 module.exports = { checks };
 
 async function serve() {

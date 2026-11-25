@@ -1,6 +1,6 @@
 // The playable replug demo: draws demo-model.js's state and animates its steps.
 // The model is always already final; this file only decides how it looks getting there.
-import { createDemo, unplug, plugIn, act, focus, shortcutFor } from './demo-model.js';
+import { createDemo, unplug, plugIn, act, focus, shortcutFor } from './demo-model.js?v=dev';   // ?v= is stamped with the commit at publish
 
 // Each screen's display area, in % of the stage. The device frames are drawn around these.
 const DISPLAY = {
