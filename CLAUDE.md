@@ -33,6 +33,7 @@ Design docs (private, out of repo) in `~/.claude/putdowns/window-shepherd/refere
 - Hammerspoon reference: `~/CLAUDE/window-mover` (repo cabaynes/window-mover, private; frozen 2026-10-21)
 - Domain: windowshepherd.com (Squarespace DNS)
 - Google Search Console: Domain property for windowshepherd.com (Charles's Google account), verified 2026-11-25 by a `google-site-verification` TXT record in Squarespace DNS; removing that record unverifies it
+- Google Analytics: property "Window Shepherd" (G-BNHH7JQSHD) in its own account, not under the SBG-brand accounts (a first try landed in KrakenPerformance and was trashed 2026-11-25). "How people find it": Reports → Acquisition → Traffic acquisition
 
 ## Notes
 - Claude's shell on this Mac can't drive real windows: AX *reads* work since at least 2026-11-24 (`wsctl ax` got real titles), but in 2026-10 AX calls from its process tree returned stand-in elements; synthetic keystrokes are dropped, and screenshots fail (even via Hammerspoon, 2026-10-19). Live checks need the app's own Accessibility grant and `scripts/e2e.sh` run from Terminal.
