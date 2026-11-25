@@ -306,6 +306,11 @@ checks.push({ name: 'toy windows have unique names and say which is selected', p
   return /selected/i.test(r.caption) || 'caption: ' + r.caption;
 }});
 
+checks.push({ name: 'footer names ChaCha Ventures', per: 'viewport', run: async ({ page }) => {
+  const t = await page.textContent('footer');
+  return /© 20\d\d ChaCha Ventures/.test(t) || 'footer: ' + t.slice(0, 120);
+}});
+
 module.exports = { checks };
 
 async function serve() {
